@@ -1,14 +1,15 @@
-"""Tools: fl_list_channels, fl_set_channel_volume."""
+"""Tools: fl_list_channels, fl_set_channel_volume, fl_set_channel_pan."""
 
 from mcp.server.fastmcp import FastMCP
 
 from ..bridge import FLStudioBridge, format_result
 from ..errors import ErrorCode, FLMCPError
-from ..models import ListChannelsInput, SetChannelVolumeInput
+from ..models import ListChannelsInput, SetChannelPanInput, SetChannelVolumeInput
 from ..protocol import (
     RESP_CHANNELS,
     decode_resp_channels,
     encode_query_channels,
+    encode_set_channel_pan,
     encode_set_channel_vol,
 )
 
@@ -117,4 +118,52 @@ def register(mcp: FastMCP) -> None:
 
         result["channel_index"] = params.channel_index
         result["volume"] = params.volume
+        return format_result(result)
+
+    @mcp.tool(
+        name="fl_set_channel_pan",
+        annotations={
+            "title": "Set Channel Pan",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def fl_set_channel_pan(params: SetChannelPanInput) -> str:
+        """Set the stereo panning of a channel rack slot in FL Studio.
+
+        Sends CMD_SET_CHANNEL_PAN (F0 7D 13 ch_idx pan F7) to the bridge
+        script, which calls channels.setChannelPan(index, normalised).
+
+        Pan scale: 0 = full left, 64 = centre (default), 127 = full right.
+        FL Studio maps this to -1.0 → 0.0 → +1.0 internally.
+
+        Use fl_list_channels to discover channel indices by name.
+
+        Requires fl_connect and the FL MCP Bridge script loaded.
+
+        Args:
+            params (SetChannelPanInput):
+                - channel_index (int 0-127): Channel rack slot (0-based).
+                - pan (int 0-127): Pan position. 64 = centre. Default 64.
+
+        Returns:
+            str: JSON with keys:
+                - sent (bool) or dry_run (bool)
+                - channel_index (int)
+                - pan (int)
+                - bytes (str): hex of SysEx sent
+        """
+        bridge = FLStudioBridge.get()
+        try:
+            sysex = encode_set_channel_pan(params.channel_index, params.pan)
+            result = bridge.send_raw(sysex)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+        except ValueError as exc:
+            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+
+        result["channel_index"] = params.channel_index
+        result["pan"] = params.pan
         return format_result(result)

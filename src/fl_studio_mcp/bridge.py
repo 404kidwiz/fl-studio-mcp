@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import queue as thread_queue
+import sys
 import time
 from typing import Any, Callable
 
@@ -44,6 +45,8 @@ class FLStudioBridge:
         self._dry_run: bool = os.getenv("FL_MCP_DRY_RUN", "0") == "1"
         # Thread-safe queue for MIDI responses from FL Studio
         self._response_queue: thread_queue.Queue[dict[str, Any]] = thread_queue.Queue(maxsize=64)
+        # Lock to serialise concurrent bidirectional queries (prevents response swapping)
+        self._query_lock: asyncio.Lock | None = None
 
     # ------------------------------------------------------------------
     # Singleton
@@ -166,11 +169,20 @@ class FLStudioBridge:
         try:
             self._response_queue.put_nowait({"cmd": cmd, "payload": payload})
         except thread_queue.Full:
-            pass  # drop oldest if queue overflows
+            print(
+                f"[FL MCP Bridge] WARNING: response queue full — dropping cmd {cmd:#04x}. "
+                "This may cause a tool timeout. Consider calling fl_disconnect and reconnecting.",
+                file=sys.stderr,
+            )
 
     def disconnect(self) -> None:
         self._close_output()
         self._close_input()
+        # Always clear names + dry_run so status() reflects a clean slate
+        self._output_port_name = ""
+        self._input_port_name = ""
+        self._dry_run = False
+        self._query_lock = None  # reset lock so a new event loop gets a fresh one
 
     def _close_output(self) -> None:
         if self._output_port is not None:
@@ -233,6 +245,12 @@ class FLStudioBridge:
             except thread_queue.Empty:
                 break
 
+    def _get_query_lock(self) -> asyncio.Lock:
+        """Lazily create the query lock on the running event loop."""
+        if self._query_lock is None:
+            self._query_lock = asyncio.Lock()
+        return self._query_lock
+
     async def query(
         self,
         sysex_bytes: bytes,
@@ -240,6 +258,10 @@ class FLStudioBridge:
         timeout_ms: int = 2000,
     ) -> dict[str, Any] | None:
         """Send a query SysEx and wait for a matching response from FL Studio.
+
+        Serialised via asyncio.Lock so concurrent tool calls cannot steal each
+        other's responses (e.g. fl_get_status and fl_list_channels called at
+        the same time will queue rather than swap payloads).
 
         Returns the response dict {cmd, payload} on success, or None on timeout.
         Returns None immediately in dry-run mode (callers substitute mock data).
@@ -254,23 +276,24 @@ class FLStudioBridge:
             self.send_raw(sysex_bytes)
             return None
 
-        self._drain_queue()
-        self.send_raw(sysex_bytes)
+        async with self._get_query_lock():
+            self._drain_queue()
+            self.send_raw(sysex_bytes)
 
-        deadline = time.monotonic() + timeout_ms / 1000.0
-        while time.monotonic() < deadline:
-            try:
-                item = self._response_queue.get_nowait()
-                if item["cmd"] == expected_cmd:
-                    return item
-                # Not our response — put it back for another waiter
+            deadline = time.monotonic() + timeout_ms / 1000.0
+            while time.monotonic() < deadline:
                 try:
-                    self._response_queue.put_nowait(item)
-                except thread_queue.Full:
+                    item = self._response_queue.get_nowait()
+                    if item["cmd"] == expected_cmd:
+                        return item
+                    # Not our response — put it back for the next waiter
+                    try:
+                        self._response_queue.put_nowait(item)
+                    except thread_queue.Full:
+                        pass
+                except thread_queue.Empty:
                     pass
-            except thread_queue.Empty:
-                pass
-            await asyncio.sleep(_POLL_INTERVAL)
+                await asyncio.sleep(_POLL_INTERVAL)
 
         return None  # timeout
 

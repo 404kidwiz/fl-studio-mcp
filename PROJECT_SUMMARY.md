@@ -1,11 +1,11 @@
 # FL Studio MCP — Project Summary
 
-**Version:** 0.1.0  
-**Status:** Active development — v1 complete, v2 enhancements identified  
+**Version:** 0.2.0  
+**Status:** Active development — v2 Sprint 1+2 complete  
 **Last updated:** 2026-04-15  
-**Commits:** 3 (initial → bidirectional → production polish)  
-**Tests:** 135 passing, 0 failing  
-**Total source lines:** ~4,400
+**Commits:** 4 (initial → bidirectional → production polish → v2 features)  
+**Tests:** 194 passing, 0 failing  
+**Total source lines:** ~5,200
 
 ---
 
@@ -27,18 +27,19 @@ fl-studio-mcp (Python FastMCP server)
         │
         ├── FLStudioBridge (singleton)
         │     ├── MIDITransport (MacOS/Windows abstraction)
+        │     ├── asyncio.Lock (_query_lock) — serialises concurrent queries
         │     ├── mido output port ──► IAC Driver ──► FL Studio
         │     └── mido input port  ◄── IAC Driver ◄── FL Studio
-        │           │ callback thread → thread_queue.Queue
+        │           │ callback thread → thread_queue.Queue (maxsize=64)
         │           └── bridge.query() polls queue w/ asyncio.sleep
         │
-        ├── tools/ (17 tools, each in its own module)
+        ├── tools/ (20 tools, each in its own module)
         ├── protocol.py (SysEx encode/decode — shared with FL script)
-        ├── models.py (Pydantic v2 schemas)
+        ├── models.py (Pydantic v2 schemas + note_name_to_pitch())
         └── errors.py (structured error types)
 
 FL Studio
-        └── fl_mcp_bridge/ (controller script v1.2)
+        └── fl_mcp_bridge/ (controller script v1.3)
               ├── OnSysEx() — receives all commands
               └── device.midiOutSysex() — sends responses
 ```
@@ -52,9 +53,9 @@ FL STUDIO McP/
 ├── src/fl_studio_mcp/
 │   ├── __init__.py
 │   ├── __main__.py               # python -m fl_studio_mcp entry
-│   ├── server.py                 # FastMCP server, registers all 17 tools
-│   ├── bridge.py                 # Singleton MIDI I/O + response queue
-│   ├── models.py                 # Pydantic schemas (Note, ChordStep, all inputs)
+│   ├── server.py                 # FastMCP server, registers all 20 tools
+│   ├── bridge.py                 # Singleton MIDI I/O + response queue + lock
+│   ├── models.py                 # Pydantic schemas + note_name_to_pitch()
 │   ├── errors.py                 # ErrorCode enum + FLMCPError
 │   ├── protocol.py               # Full SysEx protocol encode/decode
 │   ├── transports/
@@ -63,43 +64,46 @@ FL STUDIO McP/
 │   │   └── windows.py            # loopMIDI stub (same interface)
 │   └── tools/
 │       ├── midi_ports.py         # fl_list_midi_ports
-│       ├── connection.py         # fl_connect
+│       ├── connection.py         # fl_connect, fl_disconnect
 │       ├── transport_control.py  # fl_play_transport, fl_stop_transport
 │       ├── tempo.py              # fl_set_tempo
 │       ├── notes.py              # fl_insert_notes, fl_add_chord_progression
 │       ├── project.py            # fl_save_project_as
 │       ├── status.py             # fl_get_status (bidirectional)
-│       ├── channels.py           # fl_list_channels (bidir), fl_set_channel_volume
-│       ├── patterns.py           # fl_create_pattern, fl_select_pattern
+│       ├── channels.py           # fl_list_channels (bidir), fl_set_channel_volume, fl_set_channel_pan
+│       ├── patterns.py           # fl_create_pattern, fl_select_pattern, fl_clear_pattern
 │       ├── pattern_list.py       # fl_list_patterns (bidirectional)
 │       └── mixing.py             # fl_panic, fl_mute_channel, fl_solo_channel
 ├── fl_studio_scripts/
 │   └── fl_mcp_bridge/
-│       └── device_fl_mcp_bridge.py  # FL Studio controller script v1.2
+│       └── device_fl_mcp_bridge.py  # FL Studio controller script (v1.3)
 ├── tests/
 │   ├── conftest.py               # reset_bridge + dry_bridge fixtures
 │   ├── test_models.py            # Note model, chord helpers, protocol
 │   ├── test_bridge.py            # Bridge singleton, dry-run, send
-│   ├── test_tools.py             # All original 8 tools
+│   ├── test_tools.py             # Original 8 tools
 │   ├── test_bidirectional.py     # 5 bidirectional tools + protocol
 │   ├── test_mixing.py            # fl_panic, mute, solo
-│   └── test_pattern_list.py      # fl_list_patterns + pattern protocol
+│   ├── test_pattern_list.py      # fl_list_patterns + pattern protocol
+│   └── test_v2_features.py       # Sprint 1+2: note names, disconnect, clear, pan, bridge reliability
 ├── .github/
 │   └── workflows/
 │       └── test.yml              # CI: Python 3.11 + 3.12
 ├── pyproject.toml
-└── README.md
+├── README.md
+└── PROJECT_SUMMARY.md            # This file
 ```
 
 ---
 
-## All 17 Tools
+## All 20 Tools
 
-### Connection (2)
+### Connection (3)
 | Tool | Description | Needs Bridge Script |
 |------|-------------|---------------------|
 | `fl_list_midi_ports` | Lists all available MIDI input/output ports with platform recommendations | No |
-| `fl_connect` | Opens the MIDI output port. Accepts `port_name`, optional `input_port_name`, `dry_run` flag | No |
+| `fl_connect` | Opens MIDI output port. Accepts `port_name`, optional `input_port_name`, `dry_run` flag | No |
+| `fl_disconnect` | Closes active MIDI output and input ports. Safe to call anytime. Resets all state | No |
 
 ### Transport (3)
 | Tool | Description | Needs Bridge Script |
@@ -111,27 +115,29 @@ FL STUDIO McP/
 ### Notes / Composition (2)
 | Tool | Description | Needs Bridge Script |
 |------|-------------|---------------------|
-| `fl_insert_notes` | Insert 1–128 MIDI notes into the current pattern. Each note: pitch, velocity, start_tick, duration_ticks, channel | Yes |
-| `fl_add_chord_progression` | Insert 1–32 chord steps. Each step: root_pitch, quality (major/minor/dom7/maj7/min7/dim/aug/sus2/sus4), velocity, start_tick, duration_ticks | Yes |
+| `fl_insert_notes` | Insert 1–128 MIDI notes. `pitch` accepts int (60) or note name ("C4", "F#3", "Bb4") | Yes |
+| `fl_add_chord_progression` | Insert 1–32 chord steps. `root_pitch` also accepts note names | Yes |
 
 ### Project (1)
 | Tool | Description | Needs Bridge Script |
 |------|-------------|---------------------|
-| `fl_save_project_as` | Save the current project. Filename is whitelist-validated (alphanumeric/spaces/dashes/dots) | Yes |
+| `fl_save_project_as` | Save the current project. Filename whitelist-validated | Yes |
 
-### Status & Channels — Bidirectional (3)
+### Status & Channels — Bidirectional (4)
 | Tool | Description | Needs Bridge Script |
 |------|-------------|---------------------|
 | `fl_get_status` | Query FL Studio: returns playing, BPM, current pattern index, channel count | Yes |
 | `fl_list_channels` | Query channel rack: returns list of channel names in order | Yes |
 | `fl_set_channel_volume` | Set channel volume (0–127, 100 = unity gain) | Yes |
+| `fl_set_channel_pan` | Set channel pan (0 = full left, 64 = centre, 127 = full right) | Yes |
 
-### Patterns (3)
+### Patterns (4)
 | Tool | Description | Needs Bridge Script |
 |------|-------------|---------------------|
 | `fl_create_pattern` | Create (jump to) the next empty pattern slot | Yes |
 | `fl_select_pattern` | Jump to a pattern by index (0-based) | Yes |
 | `fl_list_patterns` | Query FL Studio: returns list of all pattern names | Yes |
+| `fl_clear_pattern` | ⚠️ Erase all notes from the currently selected pattern | Yes |
 
 ### Mixing (3)
 | Tool | Description | Needs Bridge Script |
@@ -139,6 +145,27 @@ FL STUDIO McP/
 | `fl_panic` | Send CC 120+121+123 on all 16 MIDI channels — kills stuck notes instantly | No (pure CC) |
 | `fl_mute_channel` | Mute or unmute a channel rack slot | Yes |
 | `fl_solo_channel` | Solo or un-solo a channel rack slot | Yes |
+
+---
+
+## Note Name Parsing
+
+`pitch` (on `Note`) and `root_pitch` (on `ChordStep`) both accept:
+
+| Input | Value | Notes |
+|-------|-------|-------|
+| `60` | 60 | Standard int |
+| `"C4"` | 60 | Middle C |
+| `"A4"` | 69 | Concert A |
+| `"F#3"` | 54 | Sharp |
+| `"Bb4"` | 70 | Flat |
+| `"Db5"` | 73 | Flat variant |
+| `"C-1"` | 0 | Lowest MIDI note |
+| `"G9"` | 127 | Highest MIDI note |
+
+Formula: `pitch = (octave + 1) * 12 + semitone`  
+Middle C = C4 = MIDI 60 (FL Studio default)  
+Case-insensitive. Whitespace stripped. Raises `ValueError` with helpful message on invalid input.
 
 ---
 
@@ -166,6 +193,8 @@ FL STUDIO McP/
 | query_patterns | `0x0C` | — | v1.2 |
 | mute_channel | `0x0D` | `[ch_idx, is_muted]` | v1.2 |
 | solo_channel | `0x0E` | `[ch_idx, is_soloed]` | v1.2 |
+| clear_pattern | `0x0F` | — (destructive) | v1.3 |
+| set_channel_pan | `0x13` | `[ch_idx, pan]` (0=L, 64=C, 127=R) | v1.3 |
 
 ### FL Studio → Server Responses
 
@@ -174,6 +203,8 @@ FL STUDIO McP/
 | status | `0x10` | `[playing, bpm_hi, bpm_lo, pat_idx, ch_count]` | v1.1 |
 | channels | `0x11` | `[count, name_len, name_bytes... × count]` | v1.1 |
 | patterns | `0x12` | `[count, name_len, name_bytes... × count]` | v1.2 |
+
+> **Namespace note:** Command bytes 0x01–0x0E and 0x13 travel server→FL. Response bytes 0x10–0x12 travel FL→server. They never collide because they flow in opposite directions. Responses are reserved in the 0x10–0x1F range.
 
 ### Note Encoding (9 bytes per note)
 ```
@@ -199,48 +230,61 @@ Works natively without the bridge script.
 ## Key Design Decisions
 
 ### Singleton Bridge
-`FLStudioBridge._instance` is held for the lifetime of the server process. MIDI ports are expensive to open/close repeatedly, and MCP tools are stateless by nature — the singleton gives them shared connection state.
+`FLStudioBridge._instance` held for the lifetime of the server process. MIDI ports are expensive to open/close repeatedly. `fl_disconnect` is now a first-class tool that resets all state (port names, dry_run flag, query lock) cleanly.
 
 ### Bidirectional Threading Model
-mido runs its input callback in a background thread. The bridge uses `thread_queue.Queue(maxsize=64)` for thread-safe handoff. `bridge.query()` is async and polls the queue with `asyncio.sleep(0.05)` intervals until the expected response cmd arrives or the deadline passes.
+mido runs its input callback in a background thread. Bridge uses `thread_queue.Queue(maxsize=64)` for thread-safe handoff. `bridge.query()` is async and polls the queue with `asyncio.sleep(0.05)` intervals.
+
+**Queue overflow:** Previously silent (`pass`). Now logs a `WARNING` to stderr with the dropped cmd byte and a reconnect hint.
+
+### Concurrent Query Safety (v2)
+`bridge.query()` is now wrapped in an `asyncio.Lock` (lazily created on first use). This prevents two simultaneous bidirectional tool calls (e.g. `fl_get_status` + `fl_list_channels` racing) from stealing each other's queue responses. The lock is reset on `disconnect()` so a new event loop gets a fresh instance.
 
 ### Dry-Run Mode
-Activated via `fl_connect(dry_run=True)` or `FL_MCP_DRY_RUN=1` env var. `send_raw()` and `query()` both short-circuit — `send_raw` returns `{dry_run: True, would_send_bytes: "..."}`, `query` returns `None` (tools substitute canned preview data). No MIDI hardware needed for development or testing.
+Activated via `fl_connect(dry_run=True)` or `FL_MCP_DRY_RUN=1` env var. `send_raw()` returns `{dry_run: True, would_send_bytes: "..."}`, `query()` returns `None` (tools substitute canned preview data). Calling `fl_disconnect()` in dry-run mode cleanly resets `_dry_run` to `False` along with all other state.
+
+### Note Name Parsing (v2)
+`note_name_to_pitch()` in `models.py` handles `"C4"`, `"F#3"`, `"Bb4"`, `"Db5"`, etc. — case-insensitive, whitespace-tolerant. Both `Note.pitch` and `ChordStep.root_pitch` accept either int or string via `field_validator`. Raises `ValueError` with a descriptive message if the format is invalid or out of MIDI range.
 
 ### Platform Abstraction
-`MIDITransport` ABC in `transports/base.py` — tool code never imports platform specifics. `get_transport()` in `transports/__init__.py` returns `MacOSMIDITransport` on Darwin, `WindowsMIDITransport` on Win32. Windows stub has the same interface; swap the implementation when ready.
+`MIDITransport` ABC in `transports/base.py` — tool code never imports platform specifics. `get_transport()` returns `MacOSMIDITransport` on Darwin, `WindowsMIDITransport` on Win32.
 
 ### Whitelist-Only FL Studio Access
 The FL Studio script only handles explicitly enumerated command bytes via a dispatch dict. Unknown `cmd` bytes are logged and ignored. No `eval()`, no shell access, no arbitrary Python execution inside FL Studio.
 
 ### Structured Errors
-Every tool returns JSON. Errors are `{"error": "ERROR_CODE", "message": "...", "details": {...}}` — never Python tracebacks in the MCP response.
+Every tool returns JSON. Errors: `{"error": "ERROR_CODE", "message": "...", "details": {...}}` — never Python tracebacks in the MCP response.
 
 ---
 
-## FL Studio Controller Script — v1.2
+## FL Studio Controller Script — v1.3
 
 **Install path (macOS):** `~/Documents/Image-Line/FL Studio/Settings/Hardware/fl_mcp_bridge/`  
 **Install path (Windows):** `%USERPROFILE%\Documents\Image-Line\FL Studio\Settings\Hardware\fl_mcp_bridge\`
 
 **Lifecycle:**
-- `OnInit()` — prints `[FL MCP Bridge v1.2] Initialized` to FL output log
+- `OnInit()` — prints `[FL MCP Bridge v1.3] Initialized` to FL output log
 - `OnSysEx(event)` — routes to dispatch dict, sets `event.handled = True`
 - `_send_sysex(cmd, payload)` — calls `device.midiOutSysex()` for responses
 
-**Implemented handlers:**
-- `_cmd_play()`, `_cmd_stop()` — `transport.start/stop()`
-- `_cmd_set_tempo()` — `transport.setTempo(bpm)` with legacy fallback via `general.processMIDICC`
-- `_cmd_insert_notes()` — tries `patterns.addNote()` (two signatures), falls back to `channels.midiNoteOn()`
-- `_cmd_save_as()` — `ui.save()`
-- `_cmd_query_status()` — reads `transport.isPlaying/getTempo`, `patterns.patternNumber`, `channels.channelCount`, sends `RESP_STATUS`
-- `_cmd_query_channels()` — reads `channels.getChannelName(i)` for each slot, sends `RESP_CHANNELS`
-- `_cmd_set_channel_vol()` — `channels.setChannelVolume(idx, vol/127.0)`
-- `_cmd_new_pattern()` — `patterns.jumpToPattern(patternCount())`
-- `_cmd_select_pattern()` — `patterns.jumpToPattern(idx)`
-- `_cmd_query_patterns()` — reads `patterns.getPatternName(i)` for each slot, sends `RESP_PATTERNS`
-- `_cmd_mute_channel()` — `channels.muteChannel(idx, bool)`
-- `_cmd_solo_channel()` — `channels.soloChannel(idx)` (FL Studio solo is a toggle)
+**All implemented handlers:**
+| Handler | FL API call | Notes |
+|---------|-------------|-------|
+| `_cmd_play()` | `transport.start()` | |
+| `_cmd_stop()` | `transport.stop()` | |
+| `_cmd_set_tempo()` | `transport.setTempo(bpm)` | Legacy fallback via `general.processMIDICC` |
+| `_cmd_insert_notes()` | `patterns.addNote()` | Two signature fallbacks + realtime fallback |
+| `_cmd_save_as()` | `ui.save()` | |
+| `_cmd_query_status()` | `transport.isPlaying/getTempo`, `patterns.patternNumber`, `channels.channelCount` | Sends RESP_STATUS |
+| `_cmd_query_channels()` | `channels.getChannelName(i)` | Sends RESP_CHANNELS |
+| `_cmd_set_channel_vol()` | `channels.setChannelVolume(idx, vol/127.0)` | |
+| `_cmd_new_pattern()` | `patterns.jumpToPattern(patternCount())` | |
+| `_cmd_select_pattern()` | `patterns.jumpToPattern(idx)` | |
+| `_cmd_query_patterns()` | `patterns.getPatternName(i)` | Sends RESP_PATTERNS |
+| `_cmd_mute_channel()` | `channels.muteChannel(idx, bool)` | |
+| `_cmd_solo_channel()` | `channels.soloChannel(idx)` | Toggle semantics in FL |
+| `_cmd_clear_pattern()` | `patterns.clearCurrentPattern()` | Fallback: `patterns.clearPattern(idx)` |
+| `_cmd_set_channel_pan()` | `channels.setChannelPan(idx, (pan-64)/64.0)` | Maps 0–127 → -1.0..+1.0 |
 
 ---
 
@@ -253,19 +297,15 @@ Every tool returns JSON. Errors are `{"error": "ERROR_CODE", "message": "...", "
 | `python-rtmidi` | ≥1.5.8 | mido backend for real hardware MIDI ports |
 | `pydantic` | ≥2.7.0 | Input validation, Note/ChordStep schemas |
 
-**Dev only:** `pytest ≥9.0.3`, `pytest-asyncio ≥1.3.0`
-
-**Python:** ≥3.11 (uses `X | Y` union syntax, `match`, `dict[str, Any]` generics)
-
+**Dev only:** `pytest ≥9.0.3`, `pytest-asyncio ≥1.3.0`  
+**Python:** ≥3.11  
 **Build:** Hatchling, `uv` for environment management
 
 ---
 
 ## Testing
 
-**135 tests across 7 files — zero hardware required.**
-
-All tests run against a `dry_bridge` fixture (pre-connected, dry-run mode). Bidirectional tests use direct queue injection to simulate FL Studio responses without a real MIDI loop.
+**194 tests across 8 files — zero hardware required.**
 
 | File | Tests | Coverage area |
 |------|-------|---------------|
@@ -275,7 +315,7 @@ All tests run against a `dry_bridge` fixture (pre-connected, dry-run mode). Bidi
 | `test_bidirectional.py` | 30 | 5 bidirectional tools + response encoders |
 | `test_mixing.py` | 29 | panic, mute, solo — protocol + tool |
 | `test_pattern_list.py` | 14 | fl_list_patterns + pattern protocol |
-| `conftest.py` | — | `reset_bridge` (autouse), `dry_bridge` fixtures |
+| `test_v2_features.py` | 59 | Note name parsing, fl_disconnect, fl_clear_pattern, fl_set_channel_pan, queue overflow, asyncio lock |
 
 ```bash
 uv run pytest tests/ -v        # run all
@@ -314,51 +354,37 @@ Steps: `uv sync` → `pytest tests/ -v` → `python -c "import fl_studio_mcp"` s
 
 ---
 
-## Typical Claude Workflow
+## Typical Claude Workflows
 
+### Start a session
 ```
-1. fl_list_midi_ports               → see available IAC ports
-2. fl_connect(port_name="IAC")      → open output + start input listener
-3. fl_get_status()                  → verify: BPM, playing state, pattern
-4. fl_set_tempo(bpm=128)
-5. fl_add_chord_progression(...)    → I-V-vi-IV
-6. fl_list_channels()               → see "Kick", "Snare", etc.
-7. fl_mute_channel(channel_index=2) → mute hi-hat
-8. fl_play_transport()
-9. fl_panic()                       → if notes get stuck
-10. fl_save_project_as(filename="MyTrack")
+fl_list_midi_ports → fl_connect(port_name="IAC") → fl_get_status()
 ```
 
----
+### Write a chord progression (now with note names)
+```
+fl_clear_pattern()
+fl_add_chord_progression(chords=[
+  {root_pitch: "C4", quality: "major",  start_tick: 0,    duration_ticks: 384},
+  {root_pitch: "G4", quality: "major",  start_tick: 384,  duration_ticks: 384},
+  {root_pitch: "A3", quality: "minor",  start_tick: 768,  duration_ticks: 384},
+  {root_pitch: "F3", quality: "major",  start_tick: 1152, duration_ticks: 384},
+])
+```
 
-## Identified Enhancements (v2 Backlog)
+### Mix a section
+```
+fl_list_channels()
+fl_set_channel_volume(channel_index=0, volume=110)   # kick louder
+fl_set_channel_pan(channel_index=2, pan=40)          # hi-hat slightly left
+fl_mute_channel(channel_index=3, muted=True)         # mute bass
+```
 
-Priority-ordered improvements identified post-v1:
-
-| # | Enhancement | Impact | Complexity |
-|---|-------------|--------|------------|
-| 1 | **Note name parsing** (`"C4"` → 60) — `field_validator` on `Note.pitch` | High | Low |
-| 2 | **`fl_clear_pattern`** — erase current pattern before inserting | High | Low |
-| 3 | **Concurrent query safety** — `asyncio.Lock` or per-cmd `asyncio.Event` dict | High | Medium |
-| 4 | **`fl_set_channel_pan`** — companion to `fl_set_channel_volume` | Medium | Low |
-| 5 | **SysEx chunking** — auto-split payloads >512 bytes for driver compatibility | Medium | Medium |
-| 6 | **`fl_disconnect`** — clean port teardown via MCP tool | Medium | Low |
-| 7 | **Scale/mode helper** — `fl_insert_scale(root, scale, octaves, rhythm)` | Medium | Medium |
-| 8 | **Velocity humanization** — `velocity_curve` option on note sequences | Low | Low |
-| 9 | **FL API type stubs** — `.pyi` files for `channels`, `patterns`, `transport` | Low | High |
-| 10 | **`fl_ping`** — 200ms heartbeat check before long operations | Low | Low |
-| Arch | **Connection staleness detection** — catch mido `OSError`, reset state | Medium | Medium |
-| Arch | **Queue overflow logging** — `pass` on Full → `print` to stderr | Low | Trivial |
-
----
-
-## Known Limitations
-
-- **`patterns.addNote()` API variability** — FL Studio's Python API signature differs across versions. The script tries two signatures and falls back to realtime note-on. Pattern-level insertion is not guaranteed on all FL builds.
-- **Solo is a toggle in FL Studio** — `channels.soloChannel(idx)` toggles; the `soloed=False` parameter has no distinct effect. The MCP tool sends the same SysEx either way, matching FL's behavior.
-- **No concurrent query protection** — two simultaneous bidirectional tools can steal each other's queue responses. Not an issue in single-threaded Claude tool calls but a real concern if used in parallel agents.
-- **No SysEx size guard** — 128 notes × 9 bytes = 1,152-byte message. Some MIDI drivers cap at 512 bytes and will silently drop it.
-- **Windows transport is a stub** — `WindowsMIDITransport` has the correct interface but calls `mido.get_output_names()` directly (same as macOS). Needs loopMIDI testing.
+### Emergency
+```
+fl_panic()           # stuck notes
+fl_disconnect()      # stale connection after crash
+```
 
 ---
 
@@ -388,8 +414,37 @@ uv build
 
 ## Git History
 
-| Commit | Message | What shipped |
-|--------|---------|--------------|
-| `fb0ca1a` | `feat: initial FL Studio MCP server` | 8 tools, bridge, transports, protocol, models, errors, tests |
-| `6a6aeea` | `feat: bidirectional MIDI + 5 new tools` | fl_get_status, fl_list_channels, fl_set_channel_volume, fl_create_pattern, fl_select_pattern, input listener, response queue, conftest |
-| `944881f` | `feat: production polish — 17 tools, panic, mute/solo, pattern list, CI` | fl_panic, fl_mute_channel, fl_solo_channel, fl_list_patterns, bridge v1.2, GitHub Actions, README rewrite |
+| Commit | What shipped |
+|--------|-------------|
+| `fb0ca1a` | Initial: 8 tools, bridge, transports, protocol, models, errors, tests |
+| `6a6aeea` | Bidirectional MIDI: fl_get_status, fl_list_channels, fl_set_channel_volume, fl_create_pattern, fl_select_pattern, input listener, response queue |
+| `944881f` | Production polish: fl_panic, fl_mute_channel, fl_solo_channel, fl_list_patterns, bridge v1.2, GitHub Actions CI, README rewrite |
+| `c55f98a` | Docs: PROJECT_SUMMARY.md |
+| _(current)_ | v2 Sprint 1+2: note name parsing, fl_disconnect, queue overflow logging, asyncio query lock, fl_clear_pattern, fl_set_channel_pan, bridge v1.3, 59 new tests |
+
+---
+
+## Remaining Backlog (Post v2)
+
+| # | Enhancement | Impact | Complexity |
+|---|-------------|--------|------------|
+| 1 | **`fl_get_pattern_notes`** — read notes back from FL Studio (new `RESP_NOTES = 0x14`) | Very High | High |
+| 2 | **`fl_get_context`** — single call returns status + channels + patterns snapshot | High | Low |
+| 3 | **SysEx chunking** — auto-split payloads >512 bytes for driver compatibility | Medium | Medium |
+| 4 | **Connection staleness detection** — catch mido `OSError`, auto-reset state | Medium | Medium |
+| 5 | **Scale/mode helper** — `fl_insert_scale(root, scale, octaves, rhythm)` | Medium | Medium |
+| 6 | **Velocity humanization** — `velocity_curve` option (`"humanize"`, `"crescendo"`) | Low | Low |
+| 7 | **FL API type stubs** — `.pyi` files for `channels`, `patterns`, `transport` modules | Low | High |
+| 8 | **`fl_ping`** — 200ms heartbeat before long operations | Low | Low |
+| 9 | **Windows transport testing** — loopMIDI validation on real Windows build | Medium | Medium |
+
+---
+
+## Known Limitations
+
+- **`patterns.addNote()` API variability** — FL Studio's Python API signature differs across versions. Script tries two signatures, falls back to realtime note-on if both fail.
+- **Solo is a toggle in FL Studio** — `channels.soloChannel(idx)` toggles state; `fl_solo_channel(soloed=False)` sends the same SysEx as `soloed=True`.
+- **`fl_clear_pattern` is destructive** — no MCP-level undo. FL Studio's own Ctrl+Z still works manually after the call.
+- **No SysEx size guard** — 128 notes × 9 bytes = 1,152-byte message. Some IAC Driver / loopMIDI configurations cap at 512 bytes and will silently drop it.
+- **Windows transport is a stub** — tested interface only; requires loopMIDI validation.
+- **`fl_get_pattern_notes` not yet implemented** — the flow is currently write-only; Claude cannot read back what notes are currently in a pattern.

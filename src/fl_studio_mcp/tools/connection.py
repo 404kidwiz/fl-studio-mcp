@@ -1,10 +1,10 @@
-"""Tool: connect_fl_studio — open the MIDI port and set session state."""
+"""Tools: fl_connect, fl_disconnect — open/close MIDI port and session state."""
 
 from mcp.server.fastmcp import FastMCP
 
 from ..bridge import FLStudioBridge, format_result
 from ..errors import FLMCPError
-from ..models import ConnectInput
+from ..models import ConnectInput, DisconnectInput
 
 
 def register(mcp: FastMCP) -> None:
@@ -61,3 +61,33 @@ def register(mcp: FastMCP) -> None:
             )
 
         return format_result(bridge.status())
+
+    @mcp.tool(
+        name="fl_disconnect",
+        annotations={
+            "title": "Disconnect from FL Studio",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def fl_disconnect(params: DisconnectInput) -> str:
+        """Close the active MIDI output and input ports.
+
+        Useful when switching ports, recovering from a stale connection after
+        FL Studio crashes, or cleanly ending a session before restart.
+
+        Safe to call even if not currently connected — returns the resulting
+        status either way.
+
+        Returns:
+            str: JSON bridge status after disconnecting:
+                - connected (bool): always False after this call
+                - port (str): empty string after disconnect
+                - dry_run (bool)
+                - platform_transport (str)
+        """
+        bridge = FLStudioBridge.get()
+        bridge.disconnect()
+        return format_result({**bridge.status(), "disconnected": True})

@@ -35,7 +35,10 @@ mcp = FastMCP(
         "Set dry_run=true in fl_connect to preview without sending MIDI. "
         "Bidirectional tools (fl_get_status, fl_list_channels, fl_list_patterns) "
         "require the FL MCP Bridge controller script loaded in FL Studio's MIDI Settings. "
-        "Use fl_panic any time notes get stuck."
+        "Use fl_panic any time notes get stuck. "
+        "Note pitch accepts integers (60) or note names (\"C4\", \"F#3\", \"Bb4\"). "
+        "Use fl_clear_pattern before inserting notes to replace rather than accumulate. "
+        "Use fl_disconnect to close ports cleanly when done."
     ),
 )
 

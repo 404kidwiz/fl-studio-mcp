@@ -1,4 +1,4 @@
-"""FL Studio MIDI Controller Script — FL MCP Bridge v1.2
+"""FL Studio MIDI Controller Script — FL MCP Bridge v1.3
 ================================================================
 Place this entire folder at:
   macOS:   ~/Documents/Image-Line/FL Studio/Settings/Hardware/fl_mcp_bridge/
@@ -27,6 +27,8 @@ SysEx Protocol (Manufacturer ID 0x7D = non-commercial):
     F0 7D 0C F7                      → Query patterns (responds with 0x12)
     F0 7D 0D ch_idx is_muted F7      → Mute/unmute channel
     F0 7D 0E ch_idx is_soloed F7     → Solo/un-solo channel
+    F0 7D 0F F7                      → Clear current pattern (destructive)
+    F0 7D 13 ch_idx pan F7           → Set channel pan (0=L, 64=C, 127=R)
 
   FL Studio → Server (responses):
     F0 7D 10 playing bpm_hi bpm_lo pat_idx ch_count F7  → Status response
@@ -38,6 +40,7 @@ Note data encoding (9 bytes per note):
   Tick value = (b2 << 14) | (b1 << 7) | b0
 
 Changelog:
+  v1.3 — Added CMD_CLEAR_PATTERN (0x0F), CMD_SET_CHANNEL_PAN (0x13)
   v1.2 — Added CMD_QUERY_PATTERNS, CMD_MUTE_CHANNEL, CMD_SOLO_CHANNEL
   v1.1 — Added bidirectional queries (status, channels, set_channel_vol, patterns)
   v1.0 — Initial release (play, stop, tempo, notes, save)
@@ -52,7 +55,7 @@ import transport
 import ui
 
 name = "FL MCP Bridge"
-version = "1.2"
+version = "1.3"
 
 # Protocol constants (mirrors protocol.py)
 _MANUFACTURER_ID = 0x7D
@@ -71,6 +74,8 @@ CMD_SELECT_PATTERN   = 0x0A
 CMD_QUERY_PATTERNS   = 0x0C
 CMD_MUTE_CHANNEL     = 0x0D
 CMD_SOLO_CHANNEL     = 0x0E
+CMD_CLEAR_PATTERN    = 0x0F
+CMD_SET_CHANNEL_PAN  = 0x13
 
 RESP_STATUS   = 0x10
 RESP_CHANNELS = 0x11
@@ -127,6 +132,8 @@ def OnSysEx(event):
         CMD_QUERY_PATTERNS:  lambda: _cmd_query_patterns(),
         CMD_MUTE_CHANNEL:    lambda: _cmd_mute_channel(payload),
         CMD_SOLO_CHANNEL:    lambda: _cmd_solo_channel(payload),
+        CMD_CLEAR_PATTERN:   lambda: _cmd_clear_pattern(),
+        CMD_SET_CHANNEL_PAN: lambda: _cmd_set_channel_pan(payload),
     }
 
     handler = dispatch.get(cmd)
@@ -378,3 +385,37 @@ def _cmd_solo_channel(payload):
         print(f"[FL MCP Bridge] Channel {ch_idx} solo toggled")
     except Exception as exc:
         print(f"[FL MCP Bridge] solo_channel failed: {exc}")
+
+
+def _cmd_clear_pattern():
+    """Erase all notes from the currently selected pattern."""
+    try:
+        patterns.clearCurrentPattern()
+        print("[FL MCP Bridge] Current pattern cleared")
+    except AttributeError:
+        # Fallback for FL versions without clearCurrentPattern
+        try:
+            pat_idx = patterns.patternNumber()
+            patterns.clearPattern(pat_idx)
+            print(f"[FL MCP Bridge] Pattern {pat_idx} cleared (via clearPattern)")
+        except Exception as exc:
+            print(f"[FL MCP Bridge] clear_pattern failed: {exc}")
+    except Exception as exc:
+        print(f"[FL MCP Bridge] clear_pattern failed: {exc}")
+
+
+def _cmd_set_channel_pan(payload):
+    if len(payload) < 2:
+        print("[FL MCP Bridge] set_channel_pan: payload too short")
+        return
+    ch_idx = payload[0]
+    pan    = payload[1]
+    try:
+        # FL Studio pan is -1.0 (left) → 0.0 (centre) → +1.0 (right)
+        # MIDI 0-127 → 0=L (-1.0), 64=C (0.0), 127=R (+1.0)
+        normalized = (pan - 64) / 64.0
+        normalized = max(-1.0, min(1.0, normalized))
+        channels.setChannelPan(ch_idx, normalized)
+        print(f"[FL MCP Bridge] Channel {ch_idx} pan → {pan} ({normalized:.3f})")
+    except Exception as exc:
+        print(f"[FL MCP Bridge] set_channel_pan failed: {exc}")

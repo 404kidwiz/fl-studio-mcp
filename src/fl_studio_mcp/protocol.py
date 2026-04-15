@@ -56,8 +56,10 @@ CMD_SELECT_PATTERN   = 0x0A
 CMD_QUERY_PATTERNS   = 0x0C
 CMD_MUTE_CHANNEL     = 0x0D
 CMD_SOLO_CHANNEL     = 0x0E
+CMD_CLEAR_PATTERN    = 0x0F   # no payload — clears current pattern
+CMD_SET_CHANNEL_PAN  = 0x13   # [ch_idx, pan] both 0-127; 64 = centre
 
-# FL Studio → Server responses
+# FL Studio → Server responses  (0x10-0x1F reserved for responses)
 RESP_STATUS   = 0x10
 RESP_CHANNELS = 0x11
 RESP_PATTERNS = 0x12
@@ -296,6 +298,28 @@ def encode_solo_channel(channel_idx: int, soloed: bool) -> bytes:
     if not 0 <= channel_idx <= 127:
         raise ValueError(f"channel_idx must be 0-127, got {channel_idx}")
     return _sysex(CMD_SOLO_CHANNEL, [channel_idx, int(soloed)])
+
+
+# ---------------------------------------------------------------------------
+# Clear pattern / channel pan
+# ---------------------------------------------------------------------------
+
+def encode_clear_pattern() -> bytes:
+    """Send CMD_CLEAR_PATTERN — erases all notes from the current pattern."""
+    return _sysex(CMD_CLEAR_PATTERN, [])
+
+
+def encode_set_channel_pan(channel_idx: int, pan: int) -> bytes:
+    """Encode a set-channel-pan command.
+
+    pan: 0 = full left, 64 = centre, 127 = full right.
+    FL Studio internally maps 0-127 → -1.0..+1.0 with 64 = 0.
+    """
+    if not 0 <= channel_idx <= 127:
+        raise ValueError(f"channel_idx must be 0-127, got {channel_idx}")
+    if not 0 <= pan <= 127:
+        raise ValueError(f"pan must be 0-127, got {pan}")
+    return _sysex(CMD_SET_CHANNEL_PAN, [channel_idx, pan])
 
 
 # ---------------------------------------------------------------------------
