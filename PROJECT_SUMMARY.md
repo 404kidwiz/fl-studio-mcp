@@ -426,17 +426,71 @@ uv build
 
 ## Remaining Backlog (Post v2)
 
-| # | Enhancement | Impact | Complexity |
-|---|-------------|--------|------------|
-| 1 | **`fl_get_pattern_notes`** — read notes back from FL Studio (new `RESP_NOTES = 0x14`) | Very High | High |
-| 2 | **`fl_get_context`** — single call returns status + channels + patterns snapshot | High | Low |
-| 3 | **SysEx chunking** — auto-split payloads >512 bytes for driver compatibility | Medium | Medium |
-| 4 | **Connection staleness detection** — catch mido `OSError`, auto-reset state | Medium | Medium |
-| 5 | **Scale/mode helper** — `fl_insert_scale(root, scale, octaves, rhythm)` | Medium | Medium |
-| 6 | **Velocity humanization** — `velocity_curve` option (`"humanize"`, `"crescendo"`) | Low | Low |
-| 7 | **FL API type stubs** — `.pyi` files for `channels`, `patterns`, `transport` modules | Low | High |
-| 8 | **`fl_ping`** — 200ms heartbeat before long operations | Low | Low |
-| 9 | **Windows transport testing** — loopMIDI validation on real Windows build | Medium | Medium |
+Items are grouped by sprint theme. Priority order within each group.
+
+---
+
+### Sprint 3 — Bidirectional Read + Pattern Control
+
+| # | Enhancement | Impact | Complexity | Protocol |
+|---|-------------|--------|------------|---------|
+| S3-1 | **`fl_get_notes`** — read all notes from current pattern; returns array of `{pitch, velocity, start, duration, channel}`. New `RESP_NOTES = 0x14`. Unlocks AI "read then edit" workflows. | Very High | High | New CMD `0x14` + `RESP 0x15` |
+| S3-2 | **`fl_get_context`** — single call returns BPM, playing state, current pattern index, channel list, note count. Saves 3-4 round trips for AI orientation. | High | Low | Compose existing queries |
+| S3-3 | **`fl_set_pattern_length`** — set pattern length in beats/bars. Critical for anything beyond default 1-bar patterns. | High | Medium | New CMD `0x15` |
+| S3-4 | **`fl_rename_channel`** — rename a channel rack instrument. AI can label what it creates. | Medium | Medium | New CMD `0x16` |
+| S3-5 | **`fl_rename_pattern`** — rename a pattern slot. Keeps sessions organized. | Medium | Medium | New CMD `0x17` |
+
+---
+
+### Sprint 4 — Mixer & Routing
+
+| # | Enhancement | Impact | Complexity | Notes |
+|---|-------------|--------|------------|-------|
+| S4-1 | **`fl_set_mixer_volume`** — set volume on a mixer track (0–127). Mixer and channel rack are separate in FL; current tools only touch the channel rack. | High | Medium | `mixer` module |
+| S4-2 | **`fl_set_mixer_pan`** — pan a mixer track left/right. | High | Low | Mirrors `fl_set_channel_pan` |
+| S4-3 | **`fl_route_to_mixer`** — assign a channel rack instrument to a mixer track. Required for any real mixing session. | High | Medium | `channels.setTarget()` |
+| S4-4 | **`fl_get_mixer_state`** — query all mixer track names, volumes, pans, and routings in one call. | Medium | High | New bidirectional query |
+| S4-5 | **`fl_set_master_volume`** — global master volume control. | Medium | Low | `mixer.setMasterVolume()` |
+| S4-6 | **`fl_set_master_pitch`** — global master pitch/transpose. | Low | Low | `mixer.setMasterPitch()` |
+
+---
+
+### Sprint 5 — Undo, Reliability & AI Quality-of-Life
+
+| # | Enhancement | Impact | Complexity | Notes |
+|---|-------------|--------|------------|-------|
+| S5-1 | **`fl_undo` / `fl_redo`** — trigger FL Studio's undo/redo stack. Simple but essential for iterative AI composition. | High | Low | `general.undoUp()` / `general.undoDown()` |
+| S5-2 | **Heartbeat / auto-reconnect** — `fl_get_status` ping before long operations; auto-reset state if FL closes/reopens. | High | Medium | Bridge-level change |
+| S5-3 | **`fl_ping`** — lightweight 200ms round-trip test. Verifies bridge is alive without side effects. | Medium | Low | New CMD `0x18` |
+| S5-4 | **Write-command ACK responses** — FL Studio sends back confirmation bytes after `fl_clear_pattern`, `fl_set_channel_pan`, etc. Tools can confirm execution rather than fire-and-forget. | Medium | Medium | Add `RESP_ACK = 0x1F` |
+| S5-5 | **Connection staleness detection** — catch mido `OSError` on send, auto-reset bridge state and surface clean error. | Medium | Medium | Bridge error handling |
+| S5-6 | **SysEx chunking** — auto-split payloads >512 bytes for IAC Driver / loopMIDI compatibility. Fixes silent drops on large note batches. | Medium | Medium | Protocol layer |
+
+---
+
+### Sprint 6 — Music Theory & Composition Helpers
+
+| # | Enhancement | Impact | Complexity | Notes |
+|---|-------------|--------|------------|-------|
+| S6-1 | **`fl_insert_scale`** — insert a full scale as notes: `fl_insert_scale(root="C4", scale="minor", octaves=2, rhythm="eighth")`. Handles theory internally. | High | Medium | Model-level |
+| S6-2 | **`fl_insert_arpeggio`** — generate arpeggiated chord patterns with configurable style (up, down, random, pingpong) and rate. | Medium | Medium | Builds on chord model |
+| S6-3 | **`fl_insert_drum_pattern`** — structured drum input: `{kick: [1,0,0,0,1,0,0,0], snare: [0,0,1,0,...]}`. Maps to channel rack rows. | High | Medium | New model |
+| S6-4 | **Velocity humanization** — `velocity_curve` option on `fl_insert_notes`: `"humanize"` (±15 random), `"crescendo"`, `"decrescendo"`. | Medium | Low | Model validator |
+| S6-5 | **Swing quantization** — `swing` param (0.0–1.0) on note insertion; shifts even-numbered 16th notes. | Medium | Low | Tick calculation |
+| S6-6 | **`fl_insert_bassline`** — generate a bassline from a chord progression root motion with configurable rhythm. | Medium | High | Composition layer |
+
+---
+
+### Sprint 7 — MCP Protocol Upgrades & Developer Experience
+
+| # | Enhancement | Impact | Complexity | Notes |
+|---|-------------|--------|------------|-------|
+| S7-1 | **MCP Resources** — expose current pattern notes, channel list, BPM as MCP Resources (not tools). Claude reads them passively without tool calls. | High | Medium | FastMCP `@mcp.resource` |
+| S7-2 | **MCP Prompt templates** — pre-built prompts: "write a 4-bar trap loop", "add a chord progression in C minor", "humanize this pattern". Chain correct tools automatically. | High | Low | FastMCP `@mcp.prompt` |
+| S7-3 | **Structured tool outputs** — add `outputSchema` to all tools. Clients that support structured content get typed data instead of raw JSON strings. | Medium | Low | FastMCP output schema |
+| S7-4 | **FL API type stubs** — `.pyi` files for `channels`, `patterns`, `transport`, `mixer` FL Studio modules. Enables IDE autocomplete in bridge script. | Low | High | Stub generation |
+| S7-5 | **Windows transport testing** — loopMIDI validation on real Windows build; wire up `WindowsMIDITransport` fully. | Medium | Medium | Transport layer |
+| S7-6 | **WebSocket transport** — optional alternative to IAC/loopMIDI. Run the bridge over a local WebSocket for remote FL Studio instances. | Low | High | New transport class |
 
 ---
 
