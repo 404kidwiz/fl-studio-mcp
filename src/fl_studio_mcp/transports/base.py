@@ -27,8 +27,12 @@ class MIDITransport(ABC):
         """Open and return a MIDI output port by exact name."""
 
     @abstractmethod
-    def open_input(self, port_name: str) -> mido.ports.BaseInput:
-        """Open and return a MIDI input port by exact name."""
+    def open_input(self, port_name: str, callback=None) -> mido.ports.BaseInput:
+        """Open and return a MIDI input port by exact name.
+
+        When callback is provided it is called in a mido-managed background
+        thread for each incoming mido.Message — no separate thread needed.
+        """
 
     @property
     @abstractmethod

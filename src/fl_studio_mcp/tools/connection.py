@@ -47,11 +47,14 @@ def register(mcp: FastMCP) -> None:
         """
         bridge = FLStudioBridge.get()
         try:
-            bridge.connect(params.port_name, dry_run=params.dry_run)
+            bridge.connect(
+                params.port_name,
+                dry_run=params.dry_run,
+                input_port_hint=params.input_port_name,
+            )
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            # resolve_port raises ValueError with a helpful message
             from ..errors import ErrorCode
             return format_result(
                 FLMCPError(ErrorCode.MIDI_PORT_NOT_FOUND, str(exc)).to_dict()

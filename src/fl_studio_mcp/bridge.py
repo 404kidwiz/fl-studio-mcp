@@ -1,35 +1,52 @@
-"""Singleton MIDI bridge — holds the open port connection and dry-run state.
+"""Singleton MIDI bridge — holds connection state, input listener, and response queue.
 
-All tools call bridge.send_raw() or bridge.send_msg() instead of touching
-mido directly, which lets dry-run intercept everything in one place.
+Architecture
+------------
+Output side:  bridge.send_raw(bytes) → mido output port → IAC Driver → FL Studio
+Input side:   FL Studio → IAC Driver → mido input port (callback) → _response_queue
+                                                                    ↓
+              tools call bridge.query(sysex, expected_cmd) → async poll with timeout
+
+Dry-run:      send_raw / query both short-circuit; query returns None (callers
+              substitute a canned "dry_run" preview response).
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
-import os
-from typing import Any
+import queue as thread_queue
+import time
+from typing import Any, Callable
 
 import mido
 
 from .errors import ErrorCode, FLMCPError
+from .protocol import decode_sysex
 from .transports import MIDITransport, get_transport
+
+# How long to poll the response queue between asyncio yields (seconds)
+_POLL_INTERVAL = 0.05
 
 
 class FLStudioBridge:
-    """Singleton that owns the MIDI output port and connection metadata."""
+    """Singleton that owns the MIDI I/O ports and bidirectional response queue."""
 
     _instance: FLStudioBridge | None = None
 
     def __init__(self) -> None:
-        self._port: mido.ports.BaseOutput | None = None
-        self._port_name: str = ""
+        import os
+        self._output_port: mido.ports.BaseOutput | None = None
+        self._input_port: mido.ports.BaseInput | None = None
+        self._output_port_name: str = ""
+        self._input_port_name: str = ""
         self._transport: MIDITransport = get_transport()
-        # Dry-run can be toggled via env var OR the connect_fl_studio tool
         self._dry_run: bool = os.getenv("FL_MCP_DRY_RUN", "0") == "1"
+        # Thread-safe queue for MIDI responses from FL Studio
+        self._response_queue: thread_queue.Queue[dict[str, Any]] = thread_queue.Queue(maxsize=64)
 
     # ------------------------------------------------------------------
-    # Singleton access
+    # Singleton
     # ------------------------------------------------------------------
 
     @classmethod
@@ -39,7 +56,7 @@ class FLStudioBridge:
         return cls._instance
 
     # ------------------------------------------------------------------
-    # Connection management
+    # Properties
     # ------------------------------------------------------------------
 
     @property
@@ -52,55 +69,126 @@ class FLStudioBridge:
 
     @property
     def connected(self) -> bool:
-        return self._port is not None or self._dry_run
+        return self._output_port is not None or self._dry_run
+
+    @property
+    def listening(self) -> bool:
+        """True if the MIDI input listener is active."""
+        return self._input_port is not None
 
     @property
     def port_name(self) -> str:
-        return self._port_name
+        return self._output_port_name
 
-    def connect(self, port_name_hint: str, dry_run: bool = False) -> str:
-        """Resolve and open the MIDI output port.
+    @property
+    def input_port_name(self) -> str:
+        return self._input_port_name
+
+    # ------------------------------------------------------------------
+    # Connection
+    # ------------------------------------------------------------------
+
+    def connect(
+        self,
+        port_name_hint: str,
+        dry_run: bool = False,
+        input_port_hint: str | None = None,
+    ) -> str:
+        """Open the MIDI output port and optionally start the input listener.
 
         Args:
-            port_name_hint: Full or partial port name (case-insensitive match).
-            dry_run: When True, skips actual MIDI I/O.
+            port_name_hint:  Full or partial output port name.
+            dry_run:         When True, skip all real MIDI I/O.
+            input_port_hint: Full or partial input port name for receiving FL Studio
+                             responses. When None, auto-detected from the same hint as
+                             the output. Pass "" to disable input explicitly.
 
         Returns:
-            The exact port name that was opened (or "(dry-run)").
+            Exact output port name opened, or "(dry-run)".
         """
         self._dry_run = dry_run
 
         if dry_run:
-            self._port_name = "(dry-run)"
-            return self._port_name
+            self._output_port_name = "(dry-run)"
+            self._input_port_name = "(dry-run)"
+            return self._output_port_name
 
+        # --- Output port ---
         outputs = self._transport.list_output_ports()
-        exact = self._transport.resolve_port(port_name_hint, outputs)
-
-        # Close previous port if open
-        if self._port is not None:
-            try:
-                self._port.close()
-            except Exception:
-                pass
-
+        exact_out = self._transport.resolve_port(port_name_hint, outputs)
+        self._close_output()
         try:
-            self._port = self._transport.open_output(exact)
+            self._output_port = self._transport.open_output(exact_out)
         except Exception as exc:
             raise FLMCPError(
                 ErrorCode.MIDI_CONNECT_FAILED,
-                f"Could not open MIDI port {exact!r}: {exc}",
-                {"port": exact},
+                f"Could not open MIDI output {exact_out!r}: {exc}",
+                {"port": exact_out},
             ) from exc
+        self._output_port_name = exact_out
 
-        self._port_name = exact
-        return exact
+        # --- Input port (bidirectional) ---
+        # Use the explicit hint, or fall back to the same hint as the output.
+        # Pass input_port_hint="" to skip.
+        effective_input_hint = input_port_hint if input_port_hint is not None else port_name_hint
+        if effective_input_hint:
+            self._start_listener(effective_input_hint)
+
+        return exact_out
+
+    def _start_listener(self, hint: str) -> bool:
+        """Try to open the MIDI input port for receiving FL Studio responses.
+
+        Returns True on success, False if no matching port found.
+        Non-fatal — tools degrade gracefully when the listener is absent.
+        """
+        try:
+            inputs = self._transport.list_input_ports()
+            exact_in = self._transport.resolve_port(hint, inputs)
+            self._close_input()
+            self._input_port = self._transport.open_input(exact_in, callback=self._on_midi_in)
+            self._input_port_name = exact_in
+            return True
+        except Exception:
+            # No matching input port — that's fine, bidirectional tools will timeout
+            return False
+
+    def _on_midi_in(self, msg: mido.Message) -> None:
+        """Called by mido in its background thread for each incoming message."""
+        if msg.type != "sysex":
+            return
+        # mido strips F0/F7 from sysex data; reconstruct full bytes for decode_sysex
+        raw = bytes([0xF0]) + bytes(msg.data) + bytes([0xF7])
+        result = decode_sysex(raw)
+        if result is None:
+            return
+        cmd, payload = result
+        try:
+            self._response_queue.put_nowait({"cmd": cmd, "payload": payload})
+        except thread_queue.Full:
+            pass  # drop oldest if queue overflows
 
     def disconnect(self) -> None:
-        if self._port is not None:
-            self._port.close()
-            self._port = None
-            self._port_name = ""
+        self._close_output()
+        self._close_input()
+
+    def _close_output(self) -> None:
+        if self._output_port is not None:
+            try:
+                self._output_port.close()
+            except Exception:
+                pass
+            self._output_port = None
+            self._output_port_name = ""
+
+    def _close_input(self) -> None:
+        if self._input_port is not None:
+            try:
+                self._input_port.close()
+            except Exception:
+                pass
+            self._input_port = None
+            self._input_port_name = ""
 
     # ------------------------------------------------------------------
     # Sending
@@ -110,17 +198,16 @@ class FLStudioBridge:
         if not self.connected:
             raise FLMCPError(
                 ErrorCode.NOT_CONNECTED,
-                "Not connected to FL Studio. Call connect_fl_studio first.",
-                {"hint": "Use list_midi_ports to find your IAC Driver port name."},
+                "Not connected to FL Studio. Call fl_connect first.",
+                {"hint": "Use fl_list_midi_ports to find your IAC Driver port name."},
             )
 
     def send_raw(self, raw_bytes: bytes) -> dict[str, Any]:
-        """Send raw SysEx bytes (or any raw MIDI bytes).
+        """Send raw bytes (SysEx or any MIDI message).
 
-        In dry-run mode, returns a preview dict instead of sending.
+        In dry-run mode returns a preview dict without touching any port.
         """
         self._require_connection()
-
         hex_str = raw_bytes.hex(" ").upper()
 
         if self._dry_run:
@@ -131,22 +218,73 @@ class FLStudioBridge:
             }
 
         msg = mido.Message.from_bytes(raw_bytes)
-        self._port.send(msg)
+        self._output_port.send(msg)
         return {"sent": True, "bytes": hex_str}
 
-    def send_msg(self, msg: mido.Message) -> dict[str, Any]:
-        """Send a mido Message object."""
-        return self.send_raw(bytes(msg.bytes()))
+    # ------------------------------------------------------------------
+    # Bidirectional query
+    # ------------------------------------------------------------------
+
+    def _drain_queue(self) -> None:
+        """Discard any stale responses before sending a new query."""
+        while True:
+            try:
+                self._response_queue.get_nowait()
+            except thread_queue.Empty:
+                break
+
+    async def query(
+        self,
+        sysex_bytes: bytes,
+        expected_cmd: int,
+        timeout_ms: int = 2000,
+    ) -> dict[str, Any] | None:
+        """Send a query SysEx and wait for a matching response from FL Studio.
+
+        Returns the response dict {cmd, payload} on success, or None on timeout.
+        Returns None immediately in dry-run mode (callers substitute mock data).
+        """
+        self._require_connection()
+
+        if self._dry_run:
+            return None
+
+        if not self.listening:
+            # No input port — send the query but return None (caller shows hint)
+            self.send_raw(sysex_bytes)
+            return None
+
+        self._drain_queue()
+        self.send_raw(sysex_bytes)
+
+        deadline = time.monotonic() + timeout_ms / 1000.0
+        while time.monotonic() < deadline:
+            try:
+                item = self._response_queue.get_nowait()
+                if item["cmd"] == expected_cmd:
+                    return item
+                # Not our response — put it back for another waiter
+                try:
+                    self._response_queue.put_nowait(item)
+                except thread_queue.Full:
+                    pass
+            except thread_queue.Empty:
+                pass
+            await asyncio.sleep(_POLL_INTERVAL)
+
+        return None  # timeout
 
     # ------------------------------------------------------------------
-    # Helpers used by tools
+    # Status
     # ------------------------------------------------------------------
 
     def status(self) -> dict[str, Any]:
         return {
-            "connected": self.connected,
-            "port": self._port_name,
-            "dry_run": self._dry_run,
+            "connected":         self.connected,
+            "port":              self._output_port_name,
+            "input_port":        self._input_port_name,
+            "listening":         self.listening,
+            "dry_run":           self._dry_run,
             "platform_transport": type(self._transport).__name__,
         }
 

@@ -29,7 +29,9 @@ class WindowsMIDITransport(MIDITransport):
     def open_output(self, port_name: str) -> mido.ports.BaseOutput:
         return mido.open_output(port_name)
 
-    def open_input(self, port_name: str) -> mido.ports.BaseInput:
+    def open_input(self, port_name: str, callback=None) -> mido.ports.BaseInput:
+        if callback is not None:
+            return mido.open_input(port_name, callback=callback)
         return mido.open_input(port_name)
 
     @property

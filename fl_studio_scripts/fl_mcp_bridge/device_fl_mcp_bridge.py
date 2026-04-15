@@ -1,4 +1,4 @@
-"""FL Studio MIDI Controller Script — FL MCP Bridge
+"""FL Studio MIDI Controller Script — FL MCP Bridge v1.1
 ================================================================
 Place this entire folder at:
   macOS:   ~/Documents/Image-Line/FL Studio/Settings/Hardware/fl_mcp_bridge/
@@ -8,25 +8,32 @@ After placing the files:
   1. Open FL Studio → Options → MIDI Settings
   2. Under Input, select your IAC Driver Bus (macOS) or loopMIDI port (Windows)
   3. Click "Enable" and set the controller script to "FL MCP Bridge"
-  4. Close and reopen MIDI Settings to confirm it loads (check the output log)
+  4. Expand the port row, set the same port for Output too (for status responses)
+  5. Close and reopen MIDI Settings to confirm it loads — check the output log
 
 SysEx Protocol (Manufacturer ID 0x7D = non-commercial):
-  F0 7D 01 F7               → Play transport
-  F0 7D 02 F7               → Stop transport
-  F0 7D 03 BPM_HI BPM_LO F7 → Set tempo (BPM = (HI<<7)|LO)
-  F0 7D 04 [note_data] F7   → Insert notes (9 bytes per note, see below)
-  F0 7D 05 [ascii] F7       → Save project
 
-Note data (9 bytes per note):
+  Server → FL Studio (commands):
+    F0 7D 01 F7                      → Play transport
+    F0 7D 02 F7                      → Stop transport
+    F0 7D 03 BPM_HI BPM_LO F7        → Set tempo
+    F0 7D 04 [9 bytes × N notes] F7  → Insert notes
+    F0 7D 05 [ASCII filename] F7     → Save project
+    F0 7D 06 F7                      → Query status (responds with 0x10)
+    F0 7D 07 F7                      → Query channels (responds with 0x11)
+    F0 7D 08 ch_idx volume F7        → Set channel volume
+    F0 7D 09 F7                      → Create new pattern
+    F0 7D 0A pat_idx F7              → Select pattern
+
+  FL Studio → Server (responses):
+    F0 7D 10 playing bpm_hi bpm_lo pat_idx ch_count F7  → Status response
+    F0 7D 11 count [name_len name_bytes...] F7           → Channels response
+
+Note data encoding (9 bytes per note):
   [pitch, velocity, channel, start_b2, start_b1, start_b0, dur_b2, dur_b1, dur_b0]
-  Tick values use 3-byte 7-bit encoding: value = (b2<<14)|(b1<<7)|b0
-
-MMC (MIDI Machine Control) is also supported natively by FL Studio:
-  F0 7F 7F 06 02 F7 → Play   (sent by fl_play_transport)
-  F0 7F 7F 06 01 F7 → Stop   (sent by fl_stop_transport)
+  Tick value = (b2 << 14) | (b1 << 7) | b0
 """
 
-# FL Studio Python scripting API modules
 import channels
 import device
 import general
@@ -35,31 +42,37 @@ import patterns
 import transport
 import ui
 
-# Script metadata
 name = "FL MCP Bridge"
-version = "1.0"
+version = "1.1"
 
-# Protocol constants (must mirror protocol.py)
+# Protocol constants (mirrors protocol.py)
 _MANUFACTURER_ID = 0x7D
-CMD_PLAY     = 0x01
-CMD_STOP     = 0x02
-CMD_SET_TEMPO = 0x03
-CMD_NOTES    = 0x04
-CMD_SAVE_AS  = 0x05
+
+CMD_PLAY             = 0x01
+CMD_STOP             = 0x02
+CMD_SET_TEMPO        = 0x03
+CMD_NOTES            = 0x04
+CMD_SAVE_AS          = 0x05
+CMD_QUERY_STATUS     = 0x06
+CMD_QUERY_CHANNELS   = 0x07
+CMD_SET_CHANNEL_VOL  = 0x08
+CMD_NEW_PATTERN      = 0x09
+CMD_SELECT_PATTERN   = 0x0A
+
+RESP_STATUS   = 0x10
+RESP_CHANNELS = 0x11
 
 
 # ---------------------------------------------------------------------------
-# Lifecycle callbacks
+# Lifecycle
 # ---------------------------------------------------------------------------
 
 def OnInit():
-    """Called when FL Studio loads the controller script."""
-    print(f"[FL MCP Bridge v{version}] Initialized. Listening for SysEx on this MIDI input.")
+    print(f"[FL MCP Bridge v{version}] Initialized. Listening for SysEx.")
     device.setHasMeters(False)
 
 
 def OnDeInit():
-    """Called when FL Studio unloads the script."""
     print("[FL MCP Bridge] Deinitialized.")
 
 
@@ -68,45 +81,55 @@ def OnDeInit():
 # ---------------------------------------------------------------------------
 
 def OnMidiMsg(event):
-    """Pass through unhandled messages to FL Studio."""
     event.handled = False
 
 
 def OnSysEx(event):
-    """Handle incoming SysEx from the MCP server.
+    """Route incoming SysEx to the appropriate command handler."""
+    data = event.sysex  # includes F0 and F7
 
-    event.sysex contains the raw bytes including F0 and F7.
-    """
-    data = event.sysex
-
-    # Minimum valid message: F0 7D <cmd> F7 = 4 bytes
     if len(data) < 4:
         return
-
     if data[0] != 0xF0 or data[-1] != 0xF7:
         return
-
-    # Check for our manufacturer ID
     if data[1] != _MANUFACTURER_ID:
         return
 
     cmd     = data[2]
-    payload = list(data[3:-1])  # strip F0, manufacturer, cmd, F7
+    payload = list(data[3:-1])
+    event.handled = True
 
-    event.handled = True  # prevent FL Studio from processing further
+    dispatch = {
+        CMD_PLAY:            lambda: _cmd_play(),
+        CMD_STOP:            lambda: _cmd_stop(),
+        CMD_SET_TEMPO:       lambda: _cmd_set_tempo(payload),
+        CMD_NOTES:           lambda: _cmd_insert_notes(payload),
+        CMD_SAVE_AS:         lambda: _cmd_save_as(payload),
+        CMD_QUERY_STATUS:    lambda: _cmd_query_status(),
+        CMD_QUERY_CHANNELS:  lambda: _cmd_query_channels(),
+        CMD_SET_CHANNEL_VOL: lambda: _cmd_set_channel_vol(payload),
+        CMD_NEW_PATTERN:     lambda: _cmd_new_pattern(),
+        CMD_SELECT_PATTERN:  lambda: _cmd_select_pattern(payload),
+    }
 
-    if cmd == CMD_PLAY:
-        _cmd_play()
-    elif cmd == CMD_STOP:
-        _cmd_stop()
-    elif cmd == CMD_SET_TEMPO:
-        _cmd_set_tempo(payload)
-    elif cmd == CMD_NOTES:
-        _cmd_insert_notes(payload)
-    elif cmd == CMD_SAVE_AS:
-        _cmd_save_as(payload)
+    handler = dispatch.get(cmd)
+    if handler:
+        handler()
     else:
         print(f"[FL MCP Bridge] Unknown command: {cmd:#x}")
+
+
+# ---------------------------------------------------------------------------
+# SysEx output helper
+# ---------------------------------------------------------------------------
+
+def _send_sysex(cmd: int, payload: list) -> None:
+    """Send a SysEx response back to the MCP server via MIDI output."""
+    data = [0xF0, _MANUFACTURER_ID, cmd] + payload + [0xF7]
+    try:
+        device.midiOutSysex(bytes(data))
+    except Exception as exc:
+        print(f"[FL MCP Bridge] midiOutSysex failed: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -114,116 +137,178 @@ def OnSysEx(event):
 # ---------------------------------------------------------------------------
 
 def _cmd_play():
-    """Start FL Studio playback."""
     transport.start()
     print("[FL MCP Bridge] Play")
 
 
 def _cmd_stop():
-    """Stop FL Studio playback."""
     transport.stop()
     print("[FL MCP Bridge] Stop")
 
 
 def _cmd_set_tempo(payload):
-    """Set project BPM from 2-byte 7-bit encoded payload."""
     if len(payload) < 2:
         print("[FL MCP Bridge] set_tempo: payload too short")
         return
-
     bpm = (payload[0] << 7) | payload[1]
     if not 20 <= bpm <= 999:
-        print(f"[FL MCP Bridge] set_tempo: BPM {bpm} out of range (20-999)")
+        print(f"[FL MCP Bridge] set_tempo: BPM {bpm} out of range")
         return
-
-    # transport.setTempo is available in FL Studio 20.9+
-    # Falls back to a general MIDI tempo event if unavailable
     try:
         transport.setTempo(bpm)
         print(f"[FL MCP Bridge] Tempo → {bpm} BPM")
     except AttributeError:
-        # Older FL Studio versions: use MIDI tempo change via general module
-        # tempo in microseconds per beat = 60,000,000 / BPM
+        # Older FL: fallback via general event
         micros = 60_000_000 // bpm
-        general.processMIDICC(
-            midi.MIDI_TEMPOCHANGE,
-            micros & 0x7F,
-            (micros >> 7) & 0x7F,
-        )
-        print(f"[FL MCP Bridge] Tempo → {bpm} BPM (via legacy fallback)")
+        try:
+            general.processMIDICC(midi.MIDI_TEMPOCHANGE, micros & 0x7F, (micros >> 7) & 0x7F)
+        except Exception:
+            pass
+        print(f"[FL MCP Bridge] Tempo → {bpm} BPM (legacy fallback)")
 
 
 def _decode_tick(b2, b1, b0):
-    """Decode 3 × 7-bit bytes back to a tick value."""
     return (b2 << 14) | (b1 << 7) | b0
 
 
 def _cmd_insert_notes(payload):
-    """Insert notes into the current pattern.
-
-    Each note is 9 bytes:
-      [pitch, vel, ch, start_b2, start_b1, start_b0, dur_b2, dur_b1, dur_b0]
-    """
     if len(payload) % 9 != 0:
         print(f"[FL MCP Bridge] insert_notes: bad payload length {len(payload)}")
         return
 
-    pat_index = patterns.patternNumber()
-    notes_inserted = 0
-    notes_played = 0
+    pat_index   = patterns.patternNumber()
+    n_inserted  = 0
+    n_realtime  = 0
 
     for i in range(0, len(payload), 9):
-        pitch      = payload[i]
-        velocity   = payload[i + 1]
-        ch         = payload[i + 2]
-        start_tick = _decode_tick(payload[i+3], payload[i+4], payload[i+5])
-        dur_ticks  = _decode_tick(payload[i+6], payload[i+7], payload[i+8])
+        pitch   = payload[i]
+        vel     = payload[i + 1]
+        ch      = payload[i + 2]
+        start   = _decode_tick(payload[i+3], payload[i+4], payload[i+5])
+        dur     = _decode_tick(payload[i+6], payload[i+7], payload[i+8])
 
-        # Attempt pattern insertion (FL Studio 20+ scripting API)
-        inserted = _try_insert_note(pat_index, pitch, velocity, ch, start_tick, dur_ticks)
-        if inserted:
-            notes_inserted += 1
+        if _try_insert_note(pat_index, pitch, vel, ch, start, dur):
+            n_inserted += 1
         else:
-            # Fallback: play note in realtime (useful when recording is armed)
-            channels.midiNoteOn(ch, pitch, velocity)
-            notes_played += 1
+            channels.midiNoteOn(ch, pitch, vel)
+            n_realtime += 1
 
-    print(
-        f"[FL MCP Bridge] Notes: {notes_inserted} inserted into pattern {pat_index}, "
-        f"{notes_played} played in realtime"
-    )
+    print(f"[FL MCP Bridge] Notes: {n_inserted} inserted, {n_realtime} played realtime")
 
 
 def _try_insert_note(pat_index, pitch, velocity, channel, start_tick, dur_ticks):
-    """Attempt to add a note to the pattern editor.
-
-    Returns True if successful, False if the API isn't available.
-    The patterns.addNote signature varies across FL Studio versions —
-    this function tries the most common forms.
-    """
+    """Try pattern-level insertion; return True on success."""
     try:
-        # FL Studio 21+ form: addNote(pattern, time, note, length, velocity, channel)
         patterns.addNote(pat_index, start_tick, pitch, dur_ticks, velocity, channel)
         return True
     except (AttributeError, TypeError):
         pass
-
     try:
-        # Alternative form seen in some versions (0-indexed channel)
         patterns.addNote(start_tick, pitch, dur_ticks, velocity)
         return True
     except (AttributeError, TypeError):
         pass
-
     return False
 
 
 def _cmd_save_as(payload):
-    """Save the current project. filename in payload is metadata only."""
     filename = "".join(chr(b) for b in payload if 32 <= b <= 126)
-    print(f"[FL MCP Bridge] Save project (requested name: {filename!r})")
+    print(f"[FL MCP Bridge] Save (name: {filename!r})")
     try:
         ui.save()
-        print("[FL MCP Bridge] Project saved.")
+        print("[FL MCP Bridge] Saved.")
     except Exception as exc:
         print(f"[FL MCP Bridge] Save failed: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Query handlers — send SysEx responses back to the MCP server
+# ---------------------------------------------------------------------------
+
+def _cmd_query_status():
+    """Respond with current transport state, BPM, pattern index, channel count."""
+    try:
+        playing     = int(transport.isPlaying())
+    except AttributeError:
+        playing = 0
+
+    try:
+        bpm_raw = transport.getTempo()
+        bpm     = max(20, min(999, int(bpm_raw)))
+    except AttributeError:
+        bpm = 120
+
+    try:
+        pat_idx = patterns.patternNumber() & 0x7F
+    except Exception:
+        pat_idx = 0
+
+    try:
+        ch_count = channels.channelCount() & 0x7F
+    except Exception:
+        ch_count = 0
+
+    bpm_hi = (bpm >> 7) & 0x7F
+    bpm_lo = bpm & 0x7F
+
+    _send_sysex(RESP_STATUS, [playing, bpm_hi, bpm_lo, pat_idx, ch_count])
+    print(f"[FL MCP Bridge] Status → playing={playing} bpm={bpm} pat={pat_idx} ch={ch_count}")
+
+
+def _cmd_query_channels():
+    """Respond with channel rack names."""
+    try:
+        count = channels.channelCount()
+    except Exception:
+        count = 0
+
+    payload = [min(count, 127)]
+    for i in range(min(count, 127)):
+        try:
+            raw_name = channels.getChannelName(i)
+        except Exception:
+            raw_name = f"Ch{i}"
+        # Truncate to 14 chars, keep only 7-bit-safe ASCII
+        safe = [ord(c) for c in raw_name[:14] if ord(c) <= 127]
+        payload.append(len(safe))
+        payload.extend(safe)
+
+    _send_sysex(RESP_CHANNELS, payload)
+    print(f"[FL MCP Bridge] Channels → {count} channels sent")
+
+
+def _cmd_set_channel_vol(payload):
+    if len(payload) < 2:
+        print("[FL MCP Bridge] set_channel_vol: payload too short")
+        return
+    ch_idx = payload[0]
+    volume = payload[1]
+    try:
+        # FL Studio volume is 0.0–1.0 internally; 100/127 ≈ 0.787 = unity
+        normalized = volume / 127.0
+        channels.setChannelVolume(ch_idx, normalized)
+        print(f"[FL MCP Bridge] Channel {ch_idx} volume → {volume} ({normalized:.3f})")
+    except Exception as exc:
+        print(f"[FL MCP Bridge] set_channel_vol failed: {exc}")
+
+
+def _cmd_new_pattern():
+    """Create (jump to) the next empty pattern slot."""
+    try:
+        count = patterns.patternCount()
+        patterns.jumpToPattern(count)
+        print(f"[FL MCP Bridge] New pattern at index {count}")
+    except Exception as exc:
+        print(f"[FL MCP Bridge] new_pattern failed: {exc}")
+
+
+def _cmd_select_pattern(payload):
+    if not payload:
+        print("[FL MCP Bridge] select_pattern: no index provided")
+        return
+    idx = payload[0]
+    try:
+        patterns.jumpToPattern(idx)
+        print(f"[FL MCP Bridge] Selected pattern {idx}")
+    except Exception as exc:
+        print(f"[FL MCP Bridge] select_pattern failed: {exc}")

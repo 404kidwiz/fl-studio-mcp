@@ -3,13 +3,23 @@
 Custom SysEx format (manufacturer ID 0x7D = "non-commercial"):
     F0 7D <cmd> [payload...] F7
 
-Commands
---------
-0x01  play       no payload
-0x02  stop       no payload
-0x03  set_tempo  payload: [BPM_HI, BPM_LO]  (7-bit encoded, value = hi<<7 | lo)
-0x04  notes      payload: N * 9 bytes per note (see encode_note_payload)
-0x05  save_as    payload: ASCII bytes of filename (7-bit safe — no 0x80+)
+Server → FL Studio commands
+---------------------------
+0x01  play              no payload
+0x02  stop              no payload
+0x03  set_tempo         [BPM_HI, BPM_LO]  (7-bit encoded, value = hi<<7 | lo)
+0x04  notes             N × 9 bytes per note
+0x05  save_as           ASCII filename bytes
+0x06  query_status      no payload  → FL responds with RESP_STATUS (0x10)
+0x07  query_channels    no payload  → FL responds with RESP_CHANNELS (0x11)
+0x08  set_channel_vol   [ch_idx, volume]  (both 0-127)
+0x09  new_pattern       no payload
+0x0A  select_pattern    [pat_idx]
+
+FL Studio → Server responses
+-----------------------------
+0x10  resp_status    [playing, bpm_hi, bpm_lo, pat_idx, ch_count]
+0x11  resp_channels  [count, name_len, name_bytes... × count]
 
 MMC (MIDI Machine Control) is used for play/stop as a fallback because FL
 Studio responds to it natively even without the controller script loaded.
@@ -17,22 +27,26 @@ Studio responds to it natively even without the controller script loaded.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
 # SysEx framing
 _SYSEX_START = 0xF0
 _SYSEX_END = 0xF7
 _MANUFACTURER_ID = 0x7D  # non-commercial / development
 
-# Command IDs
-CMD_PLAY = 0x01
-CMD_STOP = 0x02
-CMD_SET_TEMPO = 0x03
-CMD_NOTES = 0x04
-CMD_SAVE_AS = 0x05
+# Server → FL Studio commands
+CMD_PLAY             = 0x01
+CMD_STOP             = 0x02
+CMD_SET_TEMPO        = 0x03
+CMD_NOTES            = 0x04
+CMD_SAVE_AS          = 0x05
+CMD_QUERY_STATUS     = 0x06
+CMD_QUERY_CHANNELS   = 0x07
+CMD_SET_CHANNEL_VOL  = 0x08
+CMD_NEW_PATTERN      = 0x09
+CMD_SELECT_PATTERN   = 0x0A
+
+# FL Studio → Server responses
+RESP_STATUS   = 0x10
+RESP_CHANNELS = 0x11
 
 # MMC device ID 0x7F = "all devices"
 _MMC_PLAY  = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x02, 0xF7])
@@ -140,3 +154,91 @@ def decode_sysex(raw: bytes) -> tuple[int, list[int]] | None:
     cmd = raw[2]
     payload = list(raw[3:-1])
     return cmd, payload
+
+
+# ---------------------------------------------------------------------------
+# New query encoders
+# ---------------------------------------------------------------------------
+
+def encode_query_status() -> bytes:
+    return _sysex(CMD_QUERY_STATUS, [])
+
+
+def encode_query_channels() -> bytes:
+    return _sysex(CMD_QUERY_CHANNELS, [])
+
+
+def encode_set_channel_vol(channel_idx: int, volume: int) -> bytes:
+    if not 0 <= channel_idx <= 127:
+        raise ValueError(f"channel_idx must be 0-127, got {channel_idx}")
+    if not 0 <= volume <= 127:
+        raise ValueError(f"volume must be 0-127, got {volume}")
+    return _sysex(CMD_SET_CHANNEL_VOL, [channel_idx, volume])
+
+
+def encode_new_pattern() -> bytes:
+    return _sysex(CMD_NEW_PATTERN, [])
+
+
+def encode_select_pattern(pattern_idx: int) -> bytes:
+    if not 0 <= pattern_idx <= 127:
+        raise ValueError(f"pattern_idx must be 0-127, got {pattern_idx}")
+    return _sysex(CMD_SELECT_PATTERN, [pattern_idx])
+
+
+# ---------------------------------------------------------------------------
+# Response decoders  (FL Studio → MCP server)
+# ---------------------------------------------------------------------------
+
+def decode_resp_status(payload: list[int]) -> dict:
+    """Decode a RESP_STATUS payload.
+
+    Format: [playing, bpm_hi, bpm_lo, pat_idx, ch_count]
+    """
+    if len(payload) < 5:
+        raise ValueError(f"RESP_STATUS payload too short: {len(payload)} bytes")
+    return {
+        "playing":       bool(payload[0]),
+        "bpm":           decode_tempo(payload[1:3]),
+        "pattern_index": payload[3],
+        "channel_count": payload[4],
+    }
+
+
+def encode_resp_status(playing: bool, bpm: int, pattern_index: int, channel_count: int) -> bytes:
+    """Build a RESP_STATUS message (used by FL Studio script to respond)."""
+    bpm_hi = (bpm >> 7) & 0x7F
+    bpm_lo = bpm & 0x7F
+    return _sysex(RESP_STATUS, [int(playing), bpm_hi, bpm_lo, pattern_index & 0x7F, channel_count & 0x7F])
+
+
+def decode_resp_channels(payload: list[int]) -> list[str]:
+    """Decode a RESP_CHANNELS payload into a list of channel name strings.
+
+    Format: [count, name_len_0, name_bytes_0..., name_len_1, name_bytes_1..., ...]
+    """
+    if not payload:
+        return []
+    count = payload[0]
+    names: list[str] = []
+    i = 1
+    while len(names) < count and i < len(payload):
+        name_len = payload[i]
+        i += 1
+        name_bytes = payload[i : i + name_len]
+        i += name_len
+        names.append("".join(chr(b) for b in name_bytes))
+    return names
+
+
+def encode_resp_channels(names: list[str]) -> bytes:
+    """Build a RESP_CHANNELS message (used by FL Studio script to respond).
+
+    Channel names are truncated to 14 chars and filtered to 7-bit ASCII.
+    """
+    payload: list[int] = [min(len(names), 127)]
+    for name in names[:127]:
+        safe = [ord(c) for c in name[:14] if ord(c) <= 127]
+        payload.append(len(safe))
+        payload.extend(safe)
+    return _sysex(RESP_CHANNELS, payload)

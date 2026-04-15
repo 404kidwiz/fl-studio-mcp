@@ -101,7 +101,13 @@ class ConnectInput(BaseModel):
 
     port_name: str = Field(
         description='MIDI output port name. Partial match accepted (e.g. "IAC Driver"). '
-                    'Use list_midi_ports to discover available names.',
+                    'Use fl_list_midi_ports to discover available names.',
+    )
+    input_port_name: str | None = Field(
+        default=None,
+        description='MIDI input port name for receiving FL Studio responses. '
+                    'Defaults to auto-detect using the same partial match as port_name. '
+                    'Pass "" to disable input entirely.',
     )
     dry_run: bool = Field(
         default=False,
@@ -175,3 +181,45 @@ class SaveProjectAsInput(BaseModel):
                 "filename must contain only letters, numbers, spaces, dashes, underscores, and dots"
             )
         return v
+
+
+# ---------------------------------------------------------------------------
+# New tool input models
+# ---------------------------------------------------------------------------
+
+class GetStatusInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    timeout_ms: Annotated[int, Field(ge=100, le=10000)] = Field(
+        default=2000,
+        description="How long to wait for FL Studio's status response, in milliseconds (100-10000).",
+    )
+
+
+class ListChannelsInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    timeout_ms: Annotated[int, Field(ge=100, le=10000)] = Field(
+        default=2000,
+        description="How long to wait for FL Studio's channel list response, in milliseconds.",
+    )
+
+
+class SetChannelVolumeInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")] = 0
+    volume: Annotated[int, Field(ge=0, le=127, description="Volume level 0-127 (100 = unity gain)")] = 100
+
+
+class CreatePatternInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # No required params — FL Studio creates the next available pattern
+    pass
+
+
+class SelectPatternInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pattern_index: Annotated[int, Field(ge=0, le=127, description="Pattern index to jump to (0-based)")]

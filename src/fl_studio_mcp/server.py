@@ -12,16 +12,27 @@ import os
 
 from mcp.server.fastmcp import FastMCP
 
-from .tools import connection, midi_ports, notes, project, tempo, transport_control
+from .tools import (
+    channels,
+    connection,
+    midi_ports,
+    notes,
+    patterns,
+    project,
+    status,
+    tempo,
+    transport_control,
+)
 
 mcp = FastMCP(
     "fl_studio_mcp",
     instructions=(
         "Control FL Studio via MIDI. "
-        "Start with fl_list_midi_ports to discover available ports, "
-        "then fl_connect to open the connection, "
-        "then use transport/tempo/notes/project tools. "
-        "Set dry_run=true in fl_connect to preview without sending MIDI."
+        "Workflow: fl_list_midi_ports → fl_connect → fl_get_status to verify → "
+        "then use transport/tempo/notes/project/channel/pattern tools. "
+        "Set dry_run=true in fl_connect to preview without sending MIDI. "
+        "fl_get_status, fl_list_channels require the FL MCP Bridge controller "
+        "script to be loaded inside FL Studio's MIDI Settings."
     ),
 )
 
@@ -32,6 +43,9 @@ transport_control.register(mcp)
 tempo.register(mcp)
 notes.register(mcp)
 project.register(mcp)
+status.register(mcp)
+channels.register(mcp)
+patterns.register(mcp)
 
 
 def main() -> None:
