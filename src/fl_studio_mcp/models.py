@@ -223,3 +223,32 @@ class SelectPatternInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     pattern_index: Annotated[int, Field(ge=0, le=127, description="Pattern index to jump to (0-based)")]
+
+
+class ListPatternsInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    timeout_ms: Annotated[int, Field(ge=100, le=10000)] = Field(
+        default=2000,
+        description="How long to wait for FL Studio's pattern list response, in milliseconds.",
+    )
+
+
+class MuteChannelInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
+    muted: bool = Field(default=True, description="True to mute, False to unmute.")
+
+
+class SoloChannelInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
+    soloed: bool = Field(default=True, description="True to solo, False to un-solo.")
+
+
+class PanicInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # No parameters — panic always hits all 16 channels
+    pass

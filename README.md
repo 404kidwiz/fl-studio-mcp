@@ -1,9 +1,10 @@
 # FL Studio MCP
 
-Control FL Studio from Claude (or any MCP client) via MIDI.
+Control FL Studio from Claude (or any MCP client) via MIDI — bidirectional, type-safe, dry-run-capable.
 
 ```
 Claude ──stdio──► fl-studio-mcp (Python) ──MIDI SysEx──► IAC Driver ──► FL Studio
+                                          ◄──MIDI SysEx──────────────────────────
 ```
 
 ---
@@ -14,7 +15,7 @@ Claude ──stdio──► fl-studio-mcp (Python) ──MIDI SysEx──► IAC
 fl-studio-mcp/
 ├── src/fl_studio_mcp/
 │   ├── server.py              # FastMCP server — entry point
-│   ├── bridge.py              # Singleton MIDI connection + dry-run state
+│   ├── bridge.py              # Singleton MIDI connection + response queue
 │   ├── models.py              # Pydantic schemas (Note, ChordStep, inputs)
 │   ├── errors.py              # Structured error types
 │   ├── protocol.py            # SysEx encode/decode (shared with FL script)
@@ -28,206 +29,247 @@ fl-studio-mcp/
 │       ├── transport_control.py  # fl_play_transport, fl_stop_transport
 │       ├── tempo.py           # fl_set_tempo
 │       ├── notes.py           # fl_insert_notes, fl_add_chord_progression
-│       └── project.py         # fl_save_project_as
-└── fl_studio_scripts/
-    └── fl_mcp_bridge/
-        ├── device_fl_mcp_bridge.py  # FL Studio controller script
-        └── name.py
+│       ├── project.py         # fl_save_project_as
+│       ├── status.py          # fl_get_status  ← bidirectional
+│       ├── channels.py        # fl_list_channels, fl_set_channel_volume  ← bidirectional
+│       ├── patterns.py        # fl_create_pattern, fl_select_pattern
+│       ├── pattern_list.py    # fl_list_patterns  ← bidirectional
+│       └── mixing.py          # fl_panic, fl_mute_channel, fl_solo_channel
+├── fl_studio_scripts/
+│   └── fl_mcp_bridge/
+│       └── device_fl_mcp_bridge.py  # FL Studio controller script (v1.2)
+└── tests/
 ```
-
-**Communication protocol:**
-- `play` / `stop` → **MMC SysEx** (`F0 7F 7F 06 0x F7`) — FL Studio handles natively
-- `set_tempo`, `insert_notes`, `save_project_as` → **Custom SysEx** (`F0 7D <cmd> ... F7`)
-  The FL Studio controller script parses these and calls FL's Python API.
-
-**Dry-run mode:** Pass `dry_run=true` to `fl_connect` (or set `FL_MCP_DRY_RUN=1`).
-All tools return a full preview of what would be sent — no MIDI ports opened.
 
 ---
 
-## macOS Setup (v1 target)
+## Tools Reference (17 total)
 
-### 1. Enable the IAC Driver
+### Connection
 
-1. Open **Audio MIDI Setup** (Spotlight → "Audio MIDI Setup")
-2. **Window → Show MIDI Studio**
-3. Double-click **IAC Driver** → check **"Device is online"**
-4. Optionally rename the bus (e.g. "FL Studio Bus")
+| Tool | Description |
+|------|-------------|
+| `fl_list_midi_ports` | List all available MIDI input/output ports |
+| `fl_connect` | Connect to FL Studio via MIDI. Set `dry_run=true` to preview without sending |
 
-### 2. Install the FL Studio controller script
+### Transport
+
+| Tool | Description |
+|------|-------------|
+| `fl_play_transport` | Start playback |
+| `fl_stop_transport` | Stop playback |
+| `fl_set_tempo` | Set BPM (20–999) |
+
+### Notes
+
+| Tool | Description |
+|------|-------------|
+| `fl_insert_notes` | Insert up to 128 notes into the current pattern |
+| `fl_add_chord_progression` | Insert chords by root + quality (major/minor/dom7/maj7/min7/dim/aug/sus2/sus4) |
+
+### Project
+
+| Tool | Description |
+|------|-------------|
+| `fl_save_project_as` | Save the current project |
+
+### Status & Channels (bidirectional — require FL MCP Bridge script)
+
+| Tool | Description |
+|------|-------------|
+| `fl_get_status` | Query transport state, BPM, current pattern index, channel count |
+| `fl_list_channels` | List all channel rack instruments by name |
+| `fl_set_channel_volume` | Set a channel's volume (0–127, 100 = unity gain) |
+
+### Patterns
+
+| Tool | Description |
+|------|-------------|
+| `fl_create_pattern` | Create the next empty pattern slot |
+| `fl_select_pattern` | Jump to a pattern by index |
+| `fl_list_patterns` | List all pattern names (bidirectional — requires bridge script) |
+
+### Mixing
+
+| Tool | Description |
+|------|-------------|
+| `fl_panic` | Send All Notes Off + All Sound Off to all 16 MIDI channels immediately |
+| `fl_mute_channel` | Mute or unmute a channel rack slot |
+| `fl_solo_channel` | Solo or un-solo a channel rack slot |
+
+---
+
+## Quick Start (macOS)
+
+### 1. Enable IAC Driver
+
+Open **Audio MIDI Setup** → MIDI Studio → Double-click "IAC Driver" → check **Device is online** → create a bus named **"IAC Driver Bus 1"** if one doesn't exist.
+
+### 2. Install
 
 ```bash
-# Copy the bridge script folder to FL Studio's hardware scripts directory
+# From the project root
+uv sync
+```
+
+### 3. Install the FL Studio Controller Script
+
+Copy the bridge folder into FL Studio's hardware scripts directory:
+
+```bash
 cp -r fl_studio_scripts/fl_mcp_bridge \
   ~/Documents/Image-Line/FL\ Studio/Settings/Hardware/
 ```
 
-### 3. Configure FL Studio
+Then in FL Studio:
+1. **Options → MIDI Settings**
+2. Under **Input**, select your IAC Driver port → click **Enable**
+3. Set the **Controller type** to **FL MCP Bridge**
+4. Expand the port row → set the same port for **Output** too (required for bidirectional responses)
+5. Close and reopen MIDI Settings — the script prints `[FL MCP Bridge v1.2] Initialized` in the output log
 
-1. Open FL Studio → **Options → MIDI Settings**
-2. Under **Input**, find your IAC Driver bus (e.g. "IAC Driver Bus 1")
-3. Click **Enable** ✓
-4. Set the **Controller type** dropdown to **"FL MCP Bridge"**
-5. Confirm the script loads — check the output log for:
-   `[FL MCP Bridge v1.0] Initialized.`
-
-### 4. Install the MCP server
-
-```bash
-# Requires Python 3.11+, uv recommended
-cd /path/to/fl-studio-mcp
-uv sync
-
-# Test MIDI port discovery (no FL Studio needed)
-uv run fl-studio-mcp  # starts MCP server over stdio
-
-# Or run tests first
-uv run pytest
-```
-
-### 5. Add to Claude Desktop
+### 4. Add to Claude Desktop
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "fl-studio": {
+    "fl_studio_mcp": {
       "command": "uv",
       "args": [
+        "run",
         "--directory",
         "/absolute/path/to/fl-studio-mcp",
-        "run",
         "fl-studio-mcp"
-      ],
-      "env": {
-        "FL_MCP_PORT": "IAC Driver Bus 1"
-      }
+      ]
     }
   }
 }
 ```
 
-Restart Claude Desktop. You should see "fl-studio" in the MCP tools panel.
+Restart Claude Desktop. You should see the FL Studio tools in the tool picker.
 
----
+### 5. Connect and verify
 
-## Windows Setup (future)
-
-1. Install [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html)
-2. Create a virtual port named **"FL Studio Bus"**
-3. Copy `fl_studio_scripts/fl_mcp_bridge/` to:
-   `%USERPROFILE%\Documents\Image-Line\FL Studio\Settings\Hardware\`
-4. Same FL Studio MIDI Settings steps as macOS
-5. In `claude_desktop_config.json`, set `"FL_MCP_PORT": "FL Studio Bus"`
-
-No tool interface changes required — only the port name differs.
-
----
-
-## Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `fl_list_midi_ports` | List available MIDI I/O ports. No connection needed. |
-| `fl_connect` | Open the MIDI output port. Supports `dry_run=true`. |
-| `fl_play_transport` | Start FL Studio playback (MMC Play). |
-| `fl_stop_transport` | Stop FL Studio playback (MMC Stop). |
-| `fl_set_tempo` | Set project BPM (20–999). |
-| `fl_insert_notes` | Insert up to 128 MIDI notes at specific tick positions. |
-| `fl_add_chord_progression` | Insert a chord progression (major, minor, dom7, maj7, min7, dim, aug, sus2, sus4). |
-| `fl_save_project_as` | Trigger project save in FL Studio. |
-
----
-
-## Example Claude Prompts
-
+Ask Claude:
 ```
-"List my MIDI ports and connect FL Studio"
-
-"Set the tempo to 140 BPM"
-
-"Add a I-V-vi-IV chord progression in C major across 4 bars"
-
-"Insert a basic drum pattern kick on beats 1 and 3 (pitch 36, channel 9)"
-
-"Play the transport and save the project as 'BeatSession01'"
-```
-
-**Chord progression example prompt for Claude:**
-```
-Connect to FL Studio on port "IAC Driver Bus 1",
-set tempo to 128 BPM,
-then add a ii-V-I jazz progression in C major starting at bar 1:
-  Dm7 (D=62, min7) at bar 1, Am7 (A=69, min7) at bar 2, Cmaj7 (C=60, maj7) at bar 3
-Each chord should be a whole note (384 ticks).
+Call fl_list_midi_ports to see what's available.
+Then call fl_connect with the IAC Driver port name.
+Then call fl_get_status to verify the connection.
 ```
 
 ---
 
 ## Dry-Run Mode
 
-Explore the full tool surface without FL Studio or a MIDI port:
+Pass `dry_run=true` to `fl_connect` (or set `FL_MCP_DRY_RUN=1` in the environment) to run without sending any MIDI. All tools return what they *would* send, including exact SysEx bytes.
 
-```json
-// In fl_connect:
-{"port_name": "IAC Driver Bus 1", "dry_run": true}
-```
-
-Or via environment variable:
 ```bash
 FL_MCP_DRY_RUN=1 uv run fl-studio-mcp
 ```
 
-Dry-run responses include `"dry_run": true` and a `"would_send_bytes"` hex preview.
+---
+
+## Bidirectional Setup
+
+Tools marked **bidirectional** (`fl_get_status`, `fl_list_channels`, `fl_list_patterns`) send a query and wait for FL Studio to respond over the MIDI input port.
+
+Requirements:
+- The FL MCP Bridge controller script must be loaded in FL Studio
+- Both input **and** output must be assigned to the same IAC Driver port in MIDI Settings
+- `fl_connect` auto-detects the input port from the same partial name match as the output
+
+If FL Studio doesn't respond in time, the tool returns `{"error": "TIMEOUT", "hint": "..."}` with setup instructions.
 
 ---
 
-## SysEx Protocol Reference
+## SysEx Protocol
 
-```
-Play transport:   F0 7F 7F 06 02 F7          (MMC standard)
-Stop transport:   F0 7F 7F 06 01 F7          (MMC standard)
-Set tempo:        F0 7D 03 BPM_HI BPM_LO F7
-                  BPM = (BPM_HI << 7) | BPM_LO
-Insert notes:     F0 7D 04 [N × 9 bytes] F7
-                  Per note: pitch vel ch start_b2 start_b1 start_b0 dur_b2 dur_b1 dur_b0
-                  Tick = (b2<<14) | (b1<<7) | b0   [7-bit safe, max ~2M ticks]
-Save project:     F0 7D 05 [ASCII filename bytes] F7
-```
+**Manufacturer ID: `0x7D`** (non-commercial / development)
 
-Tick reference at 96 PPQ (FL Studio default):
-| Duration | Ticks |
-|----------|-------|
-| Whole note | 384 |
-| Half note | 192 |
-| Quarter note | 96 |
-| 8th note | 48 |
-| 16th note | 24 |
+### Server → FL Studio
+
+| Cmd  | Hex  | Payload |
+|------|------|---------|
+| play | `F0 7D 01 F7` | — |
+| stop | `F0 7D 02 F7` | — |
+| set_tempo | `F0 7D 03 BPM_HI BPM_LO F7` | 7-bit encoded BPM |
+| insert_notes | `F0 7D 04 [...] F7` | N × 9 bytes per note |
+| save_as | `F0 7D 05 [...] F7` | ASCII filename |
+| query_status | `F0 7D 06 F7` | — → responds 0x10 |
+| query_channels | `F0 7D 07 F7` | — → responds 0x11 |
+| set_channel_vol | `F0 7D 08 ch_idx vol F7` | both 0-127 |
+| new_pattern | `F0 7D 09 F7` | — |
+| select_pattern | `F0 7D 0A pat_idx F7` | 0-127 |
+| query_patterns | `F0 7D 0C F7` | — → responds 0x12 |
+| mute_channel | `F0 7D 0D ch_idx is_muted F7` | is_muted: 0 or 1 |
+| solo_channel | `F0 7D 0E ch_idx is_soloed F7` | toggle semantics in FL |
+
+### FL Studio → Server
+
+| Resp | Hex | Payload |
+|------|-----|---------|
+| status | `F0 7D 10 playing bpm_hi bpm_lo pat_idx ch_count F7` | |
+| channels | `F0 7D 11 count [name_len name_bytes...] F7` | |
+| patterns | `F0 7D 12 count [name_len name_bytes...] F7` | |
+
+### MIDI Panic
+
+`fl_panic` sends **standard MIDI CC** (not SysEx) directly on all 16 channels:
+- CC 123 — All Notes Off
+- CC 120 — All Sound Off  
+- CC 121 — Reset All Controllers
+
+This works **without the bridge script** since FL Studio handles these CCs natively.
 
 ---
 
-## Limitations (v1)
+## Note Encoding
 
-- **Note insertion** requires FL Studio 20+ for the `patterns.addNote` API.
-  On older versions, notes are played in realtime via `channels.midiNoteOn`
-  (arm recording in FL Studio to capture them into a pattern).
-- **save_project_as** calls `ui.save()` — it saves to the *current* project path.
-  To save under a new name, rename the project in FL Studio first.
-- MMC play/stop works without the controller script loaded (FL Studio handles it).
-  All other commands require the FL MCP Bridge script to be active.
+96 ticks = 1 quarter note (FL Studio default PPQ).
+
+```
+Quarter: 96 ticks
+Eighth:  48 ticks
+Half:    192 ticks
+Whole:   384 ticks
+```
+
+Tick values are 3-byte 7-bit encoded: `value = (b2 << 14) | (b1 << 7) | b0`
 
 ---
 
 ## Development
 
 ```bash
-uv sync
-uv run pytest -v
+# Install with dev deps
+uv sync --all-extras --dev
 
-# Verify server starts (Ctrl+C to exit)
-uv run fl-studio-mcp
+# Run tests (no MIDI hardware required)
+uv run pytest tests/ -v
+
+# Run in dry-run mode
+FL_MCP_DRY_RUN=1 uv run fl-studio-mcp
+
+# Inspect tools interactively
+npx @modelcontextprotocol/inspector uv run fl-studio-mcp
 ```
 
-Protocol changes belong in `protocol.py` — keep it in sync with the FL Studio
-script's parsing logic in `device_fl_mcp_bridge.py`.
+---
+
+## Windows
+
+The transport layer is abstracted behind `MIDITransport`. On Windows, use [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html) to create a virtual port instead of the IAC Driver. The tool interfaces and SysEx protocol are identical.
+
+---
+
+## Troubleshooting
+
+**Notes stuck / hanging** — Call `fl_panic`. It fires 48 CC messages directly, no script needed.
+
+**`fl_get_status` times out** — Verify the bridge script is loaded and the IAC Driver output is assigned in MIDI Settings. The script must print its init message in the FL output log.
+
+**No ports listed** — On macOS, open Audio MIDI Setup and confirm the IAC Driver is online. On Windows, start loopMIDI before launching FL Studio.
+
+**`fl_connect` fails** — Port name matching is partial and case-insensitive. Pass `"IAC"` and it'll match `"IAC Driver Bus 1"`. Use `fl_list_midi_ports` first to see exact names.

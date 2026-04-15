@@ -15,11 +15,20 @@ Server → FL Studio commands
 0x08  set_channel_vol   [ch_idx, volume]  (both 0-127)
 0x09  new_pattern       no payload
 0x0A  select_pattern    [pat_idx]
+0x0B  (reserved — panic is pure MIDI CC, no SysEx needed)
+0x0C  query_patterns    no payload  → FL responds with RESP_PATTERNS (0x12)
+0x0D  mute_channel      [ch_idx, is_muted(0|1)]
+0x0E  solo_channel      [ch_idx, is_soloed(0|1)]
 
 FL Studio → Server responses
 -----------------------------
 0x10  resp_status    [playing, bpm_hi, bpm_lo, pat_idx, ch_count]
 0x11  resp_channels  [count, name_len, name_bytes... × count]
+0x12  resp_patterns  [count, name_len, name_bytes... × count]
+
+Panic:
+    Standard MIDI CC 120 (All Sound Off) + CC 123 (All Notes Off) sent
+    directly on all 16 channels — no SysEx or FL Studio script required.
 
 MMC (MIDI Machine Control) is used for play/stop as a fallback because FL
 Studio responds to it natively even without the controller script loaded.
@@ -43,10 +52,15 @@ CMD_QUERY_CHANNELS   = 0x07
 CMD_SET_CHANNEL_VOL  = 0x08
 CMD_NEW_PATTERN      = 0x09
 CMD_SELECT_PATTERN   = 0x0A
+# 0x0B reserved
+CMD_QUERY_PATTERNS   = 0x0C
+CMD_MUTE_CHANNEL     = 0x0D
+CMD_SOLO_CHANNEL     = 0x0E
 
 # FL Studio → Server responses
 RESP_STATUS   = 0x10
 RESP_CHANNELS = 0x11
+RESP_PATTERNS = 0x12
 
 # MMC device ID 0x7F = "all devices"
 _MMC_PLAY  = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x02, 0xF7])
@@ -242,3 +256,61 @@ def encode_resp_channels(names: list[str]) -> bytes:
         payload.append(len(safe))
         payload.extend(safe)
     return _sysex(RESP_CHANNELS, payload)
+
+
+# ---------------------------------------------------------------------------
+# Pattern list (mirrors channel encoding, different cmd/resp bytes)
+# ---------------------------------------------------------------------------
+
+def encode_query_patterns() -> bytes:
+    return _sysex(CMD_QUERY_PATTERNS, [])
+
+
+def decode_resp_patterns(payload: list[int]) -> list[str]:
+    """Decode RESP_PATTERNS payload → list of pattern name strings."""
+    # Same wire format as RESP_CHANNELS
+    return decode_resp_channels(payload)
+
+
+def encode_resp_patterns(names: list[str]) -> bytes:
+    """Build a RESP_PATTERNS message (used by FL Studio script)."""
+    payload: list[int] = [min(len(names), 127)]
+    for name in names[:127]:
+        safe = [ord(c) for c in name[:14] if ord(c) <= 127]
+        payload.append(len(safe))
+        payload.extend(safe)
+    return _sysex(RESP_PATTERNS, payload)
+
+
+# ---------------------------------------------------------------------------
+# Mute / Solo
+# ---------------------------------------------------------------------------
+
+def encode_mute_channel(channel_idx: int, muted: bool) -> bytes:
+    if not 0 <= channel_idx <= 127:
+        raise ValueError(f"channel_idx must be 0-127, got {channel_idx}")
+    return _sysex(CMD_MUTE_CHANNEL, [channel_idx, int(muted)])
+
+
+def encode_solo_channel(channel_idx: int, soloed: bool) -> bytes:
+    if not 0 <= channel_idx <= 127:
+        raise ValueError(f"channel_idx must be 0-127, got {channel_idx}")
+    return _sysex(CMD_SOLO_CHANNEL, [channel_idx, int(soloed)])
+
+
+# ---------------------------------------------------------------------------
+# Panic helpers (pure MIDI CC — no SysEx, no FL Studio script needed)
+# ---------------------------------------------------------------------------
+
+def panic_messages() -> list[bytes]:
+    """Return all-notes-off + all-sound-off CC messages for all 16 channels.
+
+    Each tuple is a raw MIDI byte sequence ready for mido.Message.from_bytes().
+    """
+    msgs: list[bytes] = []
+    for ch in range(16):
+        status = 0xB0 | ch  # Control Change on channel ch
+        msgs.append(bytes([status, 123, 0]))  # All Notes Off
+        msgs.append(bytes([status, 120, 0]))  # All Sound Off
+        msgs.append(bytes([status, 121, 0]))  # Reset All Controllers
+    return msgs

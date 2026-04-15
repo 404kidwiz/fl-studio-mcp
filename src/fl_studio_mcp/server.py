@@ -16,7 +16,9 @@ from .tools import (
     channels,
     connection,
     midi_ports,
+    mixing,
     notes,
+    pattern_list,
     patterns,
     project,
     status,
@@ -29,10 +31,11 @@ mcp = FastMCP(
     instructions=(
         "Control FL Studio via MIDI. "
         "Workflow: fl_list_midi_ports → fl_connect → fl_get_status to verify → "
-        "then use transport/tempo/notes/project/channel/pattern tools. "
+        "then use transport/tempo/notes/project/channel/pattern/mixing tools. "
         "Set dry_run=true in fl_connect to preview without sending MIDI. "
-        "fl_get_status, fl_list_channels require the FL MCP Bridge controller "
-        "script to be loaded inside FL Studio's MIDI Settings."
+        "Bidirectional tools (fl_get_status, fl_list_channels, fl_list_patterns) "
+        "require the FL MCP Bridge controller script loaded in FL Studio's MIDI Settings. "
+        "Use fl_panic any time notes get stuck."
     ),
 )
 
@@ -46,6 +49,8 @@ project.register(mcp)
 status.register(mcp)
 channels.register(mcp)
 patterns.register(mcp)
+pattern_list.register(mcp)
+mixing.register(mcp)
 
 
 def main() -> None:

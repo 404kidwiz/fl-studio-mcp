@@ -1,4 +1,4 @@
-"""FL Studio MIDI Controller Script — FL MCP Bridge v1.1
+"""FL Studio MIDI Controller Script — FL MCP Bridge v1.2
 ================================================================
 Place this entire folder at:
   macOS:   ~/Documents/Image-Line/FL Studio/Settings/Hardware/fl_mcp_bridge/
@@ -24,14 +24,23 @@ SysEx Protocol (Manufacturer ID 0x7D = non-commercial):
     F0 7D 08 ch_idx volume F7        → Set channel volume
     F0 7D 09 F7                      → Create new pattern
     F0 7D 0A pat_idx F7              → Select pattern
+    F0 7D 0C F7                      → Query patterns (responds with 0x12)
+    F0 7D 0D ch_idx is_muted F7      → Mute/unmute channel
+    F0 7D 0E ch_idx is_soloed F7     → Solo/un-solo channel
 
   FL Studio → Server (responses):
     F0 7D 10 playing bpm_hi bpm_lo pat_idx ch_count F7  → Status response
     F0 7D 11 count [name_len name_bytes...] F7           → Channels response
+    F0 7D 12 count [name_len name_bytes...] F7           → Patterns response
 
 Note data encoding (9 bytes per note):
   [pitch, velocity, channel, start_b2, start_b1, start_b0, dur_b2, dur_b1, dur_b0]
   Tick value = (b2 << 14) | (b1 << 7) | b0
+
+Changelog:
+  v1.2 — Added CMD_QUERY_PATTERNS, CMD_MUTE_CHANNEL, CMD_SOLO_CHANNEL
+  v1.1 — Added bidirectional queries (status, channels, set_channel_vol, patterns)
+  v1.0 — Initial release (play, stop, tempo, notes, save)
 """
 
 import channels
@@ -43,7 +52,7 @@ import transport
 import ui
 
 name = "FL MCP Bridge"
-version = "1.1"
+version = "1.2"
 
 # Protocol constants (mirrors protocol.py)
 _MANUFACTURER_ID = 0x7D
@@ -58,9 +67,14 @@ CMD_QUERY_CHANNELS   = 0x07
 CMD_SET_CHANNEL_VOL  = 0x08
 CMD_NEW_PATTERN      = 0x09
 CMD_SELECT_PATTERN   = 0x0A
+# 0x0B reserved (panic is pure MIDI CC — no SysEx needed)
+CMD_QUERY_PATTERNS   = 0x0C
+CMD_MUTE_CHANNEL     = 0x0D
+CMD_SOLO_CHANNEL     = 0x0E
 
 RESP_STATUS   = 0x10
 RESP_CHANNELS = 0x11
+RESP_PATTERNS = 0x12
 
 
 # ---------------------------------------------------------------------------
@@ -110,6 +124,9 @@ def OnSysEx(event):
         CMD_SET_CHANNEL_VOL: lambda: _cmd_set_channel_vol(payload),
         CMD_NEW_PATTERN:     lambda: _cmd_new_pattern(),
         CMD_SELECT_PATTERN:  lambda: _cmd_select_pattern(payload),
+        CMD_QUERY_PATTERNS:  lambda: _cmd_query_patterns(),
+        CMD_MUTE_CHANNEL:    lambda: _cmd_mute_channel(payload),
+        CMD_SOLO_CHANNEL:    lambda: _cmd_solo_channel(payload),
     }
 
     handler = dispatch.get(cmd)
@@ -312,3 +329,52 @@ def _cmd_select_pattern(payload):
         print(f"[FL MCP Bridge] Selected pattern {idx}")
     except Exception as exc:
         print(f"[FL MCP Bridge] select_pattern failed: {exc}")
+
+
+def _cmd_query_patterns():
+    """Respond with pattern names."""
+    try:
+        count = patterns.patternCount()
+    except Exception:
+        count = 0
+
+    payload = [min(count, 127)]
+    for i in range(min(count, 127)):
+        try:
+            raw_name = patterns.getPatternName(i)
+        except Exception:
+            raw_name = f"Pattern {i + 1}"
+        # Truncate to 14 chars, keep only 7-bit-safe ASCII
+        safe = [ord(c) for c in raw_name[:14] if ord(c) <= 127]
+        payload.append(len(safe))
+        payload.extend(safe)
+
+    _send_sysex(RESP_PATTERNS, payload)
+    print(f"[FL MCP Bridge] Patterns → {count} patterns sent")
+
+
+def _cmd_mute_channel(payload):
+    if len(payload) < 2:
+        print("[FL MCP Bridge] mute_channel: payload too short")
+        return
+    ch_idx  = payload[0]
+    is_muted = bool(payload[1])
+    try:
+        channels.muteChannel(ch_idx, is_muted)
+        state = "muted" if is_muted else "unmuted"
+        print(f"[FL MCP Bridge] Channel {ch_idx} {state}")
+    except Exception as exc:
+        print(f"[FL MCP Bridge] mute_channel failed: {exc}")
+
+
+def _cmd_solo_channel(payload):
+    if len(payload) < 2:
+        print("[FL MCP Bridge] solo_channel: payload too short")
+        return
+    ch_idx = payload[0]
+    # soloed flag sent for symmetry; FL Studio's soloChannel is a toggle
+    try:
+        channels.soloChannel(ch_idx)
+        print(f"[FL MCP Bridge] Channel {ch_idx} solo toggled")
+    except Exception as exc:
+        print(f"[FL MCP Bridge] solo_channel failed: {exc}")
