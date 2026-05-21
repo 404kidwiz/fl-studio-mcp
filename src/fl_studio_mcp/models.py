@@ -252,25 +252,15 @@ class AddChordProgressionInput(BaseModel):
     )
 
 
-class SaveProjectAsInput(BaseModel):
+class SaveProjectInput(BaseModel):
+    """Input for saving the current project.
+
+    FL Studio's ui.save() saves to the current filename (Ctrl+S equivalent).
+    If the project has never been saved, FL Studio shows its native Save dialog.
+    No filename can be set programmatically from a controller script.
+    """
+
     model_config = ConfigDict(extra="forbid")
-
-    filename: str = Field(
-        description="Project filename without extension (e.g. 'MyTrack'). "
-                    "The FL Studio script calls ui.save(); the filename is sent as metadata.",
-        min_length=1,
-        max_length=255,
-    )
-
-    @field_validator("filename")
-    @classmethod
-    def no_path_traversal(cls, v: str) -> str:
-        # Whitelist: alphanumeric, spaces, dashes, underscores, dots
-        if not re.match(r'^[\w\s\-\.]+$', v):
-            raise ValueError(
-                "filename must contain only letters, numbers, spaces, dashes, underscores, and dots"
-            )
-        return v
 
 
 # ---------------------------------------------------------------------------
@@ -350,14 +340,92 @@ class DisconnectInput(BaseModel):
     pass
 
 
-class ClearPatternInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    # No parameters — clears the currently selected pattern
-    pass
-
 
 class SetChannelPanInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
     pan: Annotated[int, Field(ge=0, le=127, description="Pan position: 0=full left, 64=centre, 127=full right")] = 64
+
+
+class GetNotesInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    timeout_ms: Annotated[int, Field(ge=100, le=10000)] = Field(
+        default=2000,
+        description="How long to wait for FL Studio's notes response, in milliseconds.",
+    )
+
+
+class GetContextInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    timeout_ms: Annotated[int, Field(ge=100, le=10000)] = Field(
+        default=2000,
+        description="How long to wait for FL Studio's context response, in milliseconds.",
+    )
+
+
+class SetPatternLengthInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pattern_index: Annotated[int, Field(ge=0, le=999, description="Pattern index (0-based, up to 999)")]
+    length_beats: Annotated[int, Field(ge=1, le=999, description="Target pattern length in beats (1-999)")]
+
+
+class RenameChannelInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
+    name: Annotated[str, Field(min_length=1, max_length=14, description="New name (ASCII characters only, max 14 chars)")]
+
+    @field_validator("name")
+    @classmethod
+    def validate_ascii(cls, v: str) -> str:
+        if not v.isascii():
+            raise ValueError("Name must contain ASCII characters only.")
+        return v
+
+
+class RenamePatternInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pattern_index: Annotated[int, Field(ge=0, le=999, description="Pattern index (0-based, up to 999)")]
+    name: Annotated[str, Field(min_length=1, max_length=14, description="New name (ASCII characters only, max 14 chars)")]
+
+    @field_validator("name")
+    @classmethod
+    def validate_ascii(cls, v: str) -> str:
+        if not v.isascii():
+            raise ValueError("Name must contain ASCII characters only.")
+        return v
+
+
+class SetMixerVolumeInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    track_index: Annotated[int, Field(ge=0, le=127, description="Mixer track index (0-127)")] = 0
+    volume: Annotated[int, Field(ge=0, le=127, description="Volume level 0-127 (100 = unity gain / 100% fader in FL)")] = 100
+
+
+class SetMixerPanInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    track_index: Annotated[int, Field(ge=0, le=127, description="Mixer track index (0-127)")]
+    pan: Annotated[int, Field(ge=0, le=127, description="Pan position: 0=full left, 64=centre, 127=full right")] = 64
+
+
+class RouteToMixerInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
+    track_index: Annotated[int, Field(ge=0, le=127, description="Mixer track index (0-127) to route to")]
+
+
+class GetMixerStateInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    start_track: Annotated[int, Field(ge=0, le=127, description="Start track index (0-127)")] = 0
+    end_track: Annotated[int, Field(ge=0, le=127, description="End track index (0-127)")] = 16
+    timeout_ms: Annotated[int, Field(ge=100, le=10000, description="How long to wait for response in milliseconds")] = 2000
+

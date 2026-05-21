@@ -17,7 +17,7 @@ from fl_studio_mcp.models import (
     InsertNotesInput,
     Note,
     PlayStopInput,
-    SaveProjectAsInput,
+    SaveProjectInput,
     SetTempoInput,
 )
 
@@ -220,31 +220,15 @@ class TestInsertNotes:
         assert result["total_notes"] == 4
 
 
-class TestSaveProjectAs:
+class TestSaveProject:
     async def test_save_dry_run(self, dry_bridge):
         from fl_studio_mcp.tools.project import register
         from mcp.server.fastmcp import FastMCP
         _mcp = FastMCP("test")
         register(_mcp)
-        fn = {t.name: t for t in _mcp._tool_manager.list_tools()}["fl_save_project_as"].fn
+        fn = {t.name: t for t in _mcp._tool_manager.list_tools()}["fl_save_project"].fn
 
-        result = parse(await fn(SaveProjectAsInput(filename="MyTrack")))
+        result = parse(await fn(SaveProjectInput()))
         assert result["dry_run"] is True
-        assert result["filename"] == "MyTrack"
+        assert result["command"] == "SAVE"
         assert result["would_send_bytes"].startswith("F0 7D 05")
-
-    async def test_path_traversal_blocked(self):
-        with pytest.raises(Exception):
-            SaveProjectAsInput(filename="../../etc/passwd")
-
-    async def test_sysex_contains_filename_bytes(self, dry_bridge):
-        from fl_studio_mcp.tools.project import register
-        from mcp.server.fastmcp import FastMCP
-        _mcp = FastMCP("test")
-        register(_mcp)
-        fn = {t.name: t for t in _mcp._tool_manager.list_tools()}["fl_save_project_as"].fn
-
-        result = parse(await fn(SaveProjectAsInput(filename="Beat")))
-        # "Beat" → 0x42 0x65 0x61 0x74 in hex
-        hex_str = result["would_send_bytes"]
-        assert "42 65 61 74" in hex_str

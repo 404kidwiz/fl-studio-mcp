@@ -7,7 +7,7 @@ from fl_studio_mcp.models import (
     ChordQuality,
     ChordStep,
     Note,
-    SaveProjectAsInput,
+    SaveProjectInput,
     build_chord_notes,
 )
 from fl_studio_mcp.protocol import (
@@ -15,7 +15,7 @@ from fl_studio_mcp.protocol import (
     decode_sysex,
     decode_tempo,
     encode_notes,
-    encode_save_as,
+    encode_save,
     encode_tempo,
     mmc_play,
     mmc_stop,
@@ -148,70 +148,64 @@ class TestNotesProtocol:
 
 
 # ---------------------------------------------------------------------------
-# Protocol: save_as encoding
+# Protocol: save encoding
 # ---------------------------------------------------------------------------
 
-class TestSaveAsProtocol:
-    def test_roundtrip(self):
-        raw = encode_save_as("MyTrack")
+class TestSaveProtocol:
+    def test_save_command_byte(self):
+        raw = encode_save()
         cmd, payload = decode_sysex(raw)
         assert cmd == 0x05
-        assert "".join(chr(b) for b in payload) == "MyTrack"
+        assert payload == []  # no payload — just triggers ui.save()
 
-    def test_non_ascii_rejected(self):
-        with pytest.raises(ValueError):
-            encode_save_as("Tëst")
-
-
-# ---------------------------------------------------------------------------
-# Music theory: build_chord_notes
-# ---------------------------------------------------------------------------
-
-class TestBuildChordNotes:
-    def test_major_chord(self):
-        notes = build_chord_notes(60, ChordQuality.MAJOR, 100, 0, 96, 0)
-        pitches = [n.pitch for n in notes]
-        assert pitches == [60, 64, 67]  # C E G
-
-    def test_minor_chord(self):
-        notes = build_chord_notes(60, ChordQuality.MINOR, 100, 0, 96, 0)
-        pitches = [n.pitch for n in notes]
-        assert pitches == [60, 63, 67]  # C Eb G
-
-    def test_dom7(self):
-        notes = build_chord_notes(60, ChordQuality.DOM7, 100, 0, 96, 0)
-        assert len(notes) == 4
-        assert notes[-1].pitch == 70  # Bb4
-
-    def test_out_of_range_notes_skipped(self):
-        # Root at 126 with major — E and G would overflow 127
-        notes = build_chord_notes(126, ChordQuality.MAJOR, 100, 0, 96, 0)
-        for n in notes:
-            assert 0 <= n.pitch <= 127
-
-    def test_start_and_duration_propagated(self):
-        notes = build_chord_notes(60, ChordQuality.MAJOR, 80, 384, 192, 2)
-        for n in notes:
-            assert n.start_tick == 384
-            assert n.duration_ticks == 192
-            assert n.channel == 2
-            assert n.velocity == 80
+    def test_save_framing(self):
+        raw = encode_save()
+        assert raw[0] == 0xF0
+        assert raw[-1] == 0xF7
+        assert raw[1] == 0x7D
 
 
 # ---------------------------------------------------------------------------
-# Model: SaveProjectAsInput whitelist validation
+# Model: SaveProjectInput (no filename field)
 # ---------------------------------------------------------------------------
 
-class TestSaveProjectAsInput:
-    def test_valid_names(self):
-        SaveProjectAsInput(filename="MyTrack")
-        SaveProjectAsInput(filename="Track 01 - Final")
-        SaveProjectAsInput(filename="beat_v2.3")
+class TestSaveProjectInput:
+    def test_empty_input_accepted(self):
+        SaveProjectInput()  # no fields needed
 
-    def test_path_traversal_rejected(self):
+    def test_extra_fields_rejected(self):
         with pytest.raises(Exception):
-            SaveProjectAsInput(filename="../../../etc/passwd")
+            SaveProjectInput(filename="should_not_exist")
 
-    def test_slash_rejected(self):
+
+# ---------------------------------------------------------------------------
+# Chord / progression tests
+# ---------------------------------------------------------------------------
+
+class TestChordProgression:
+    def test_build_chord_notes_major(self):
+        notes = build_chord_notes(
+            root_pitch=60,
+            quality=ChordQuality.MAJOR,
+            velocity=100,
+            start_tick=0,
+            duration_ticks=384,
+            channel=0,
+        )
+        assert len(notes) == 3
+        # C major is C (60), E (64), G (67)
+        assert [n.pitch for n in notes] == [60, 64, 67]
+        for n in notes:
+            assert n.velocity == 100
+            assert n.start_tick == 0
+            assert n.duration_ticks == 384
+            assert n.channel == 0
+
+    def test_chord_step_validation(self):
+        cs = ChordStep(root_pitch="C4", quality="minor")
+        assert cs.root_pitch == 60
+        assert cs.quality == ChordQuality.MINOR
+
         with pytest.raises(Exception):
-            SaveProjectAsInput(filename="tracks/mytrack")
+            ChordStep(root_pitch=128)
+

@@ -15,6 +15,7 @@ Claude ──stdio──► fl-studio-mcp (Python) ──MIDI SysEx──► IAC
 fl-studio-mcp/
 ├── src/fl_studio_mcp/
 │   ├── server.py              # FastMCP server — entry point
+│   ├── cli.py                 # Click-based CLI entry point
 │   ├── bridge.py              # Singleton MIDI connection + response queue
 │   ├── models.py              # Pydantic schemas (Note, ChordStep, inputs)
 │   ├── errors.py              # Structured error types
@@ -25,25 +26,25 @@ fl-studio-mcp/
 │       └── windows.py         # loopMIDI (Windows) — stub, same interface
 │   └── tools/
 │       ├── midi_ports.py      # fl_list_midi_ports
-│       ├── connection.py      # fl_connect
+│       ├── connection.py      # fl_connect, fl_disconnect
 │       ├── transport_control.py  # fl_play_transport, fl_stop_transport
 │       ├── tempo.py           # fl_set_tempo
 │       ├── notes.py           # fl_insert_notes, fl_add_chord_progression
-│       ├── project.py         # fl_save_project_as
+│       ├── project.py         # fl_save_project
 │       ├── status.py          # fl_get_status  ← bidirectional
-│       ├── channels.py        # fl_list_channels, fl_set_channel_volume  ← bidirectional
+│       ├── channels.py        # fl_list_channels, fl_set_channel_volume, fl_set_channel_pan  ← bidirectional
 │       ├── patterns.py        # fl_create_pattern, fl_select_pattern
 │       ├── pattern_list.py    # fl_list_patterns  ← bidirectional
 │       └── mixing.py          # fl_panic, fl_mute_channel, fl_solo_channel
 ├── fl_studio_scripts/
 │   └── fl_mcp_bridge/
-│       └── device_fl_mcp_bridge.py  # FL Studio controller script (v1.2)
+│       └── device_fl_mcp_bridge.py  # FL Studio controller script (v1.4)
 └── tests/
 ```
 
 ---
 
-## Tools Reference (17 total)
+## Tools Reference (19 total)
 
 ### Connection
 
@@ -51,6 +52,7 @@ fl-studio-mcp/
 |------|-------------|
 | `fl_list_midi_ports` | List all available MIDI input/output ports |
 | `fl_connect` | Connect to FL Studio via MIDI. Set `dry_run=true` to preview without sending |
+| `fl_disconnect` | Close active MIDI input and output ports cleanly, resetting connection state |
 
 ### Transport
 
@@ -64,14 +66,14 @@ fl-studio-mcp/
 
 | Tool | Description |
 |------|-------------|
-| `fl_insert_notes` | Insert up to 128 notes into the current pattern |
-| `fl_add_chord_progression` | Insert chords by root + quality (major/minor/dom7/maj7/min7/dim/aug/sus2/sus4) |
+| `fl_insert_notes` | Trigger notes realtime. Enable Record in FL Studio to record them |
+| `fl_add_chord_progression` | Trigger chords realtime by root + quality. Enable Record in FL Studio to record them |
 
 ### Project
 
 | Tool | Description |
 |------|-------------|
-| `fl_save_project_as` | Save the current project |
+| `fl_save_project` | Save the current project (Ctrl+S equivalent) |
 
 ### Status & Channels (bidirectional — require FL MCP Bridge script)
 
@@ -80,6 +82,7 @@ fl-studio-mcp/
 | `fl_get_status` | Query transport state, BPM, current pattern index, channel count |
 | `fl_list_channels` | List all channel rack instruments by name |
 | `fl_set_channel_volume` | Set a channel's volume (0–127, 100 = unity gain) |
+| `fl_set_channel_pan` | Set a channel's panning (0–127, 64 = center) |
 
 ### Patterns
 
@@ -126,7 +129,7 @@ Then in FL Studio:
 2. Under **Input**, select your IAC Driver port → click **Enable**
 3. Set the **Controller type** to **FL MCP Bridge**
 4. Expand the port row → set the same port for **Output** too (required for bidirectional responses)
-5. Close and reopen MIDI Settings — the script prints `[FL MCP Bridge v1.2] Initialized` in the output log
+5. Close and reopen MIDI Settings — the script prints `[FL MCP Bridge v1.4] Initialized` in the output log
 
 ### 4. Add to Claude Desktop
 
@@ -157,6 +160,56 @@ Ask Claude:
 Call fl_list_midi_ports to see what's available.
 Then call fl_connect with the IAC Driver port name.
 Then call fl_get_status to verify the connection.
+```
+
+---
+
+## Standalone CLI Interface
+
+In addition to the MCP server, `fl-studio-mcp` installs a standalone command line tool `fl-studio` powered by `click` for direct shell control.
+
+The CLI stores its port connection preferences in `~/.fl_studio_mcp.json` to enable stateless invocations for other commands:
+
+```bash
+# List all MIDI ports available on the system
+uv run fl-studio ports
+
+# Connect to a MIDI port and save connection configuration
+uv run fl-studio connect --port "IAC Driver Bus 1" --dry-run
+
+# Get bridge connection and live FL Studio status
+uv run fl-studio status
+
+# Play, stop, panic, or save the project
+uv run fl-studio play
+uv run fl-studio stop
+uv run fl-studio panic
+uv run fl-studio save
+
+# Set project tempo (BPM)
+uv run fl-studio tempo 130
+
+# Channels commands
+uv run fl-studio channels list
+uv run fl-studio channels volume <ch_idx> <val>
+uv run fl-studio channels pan <ch_idx> <val>
+uv run fl-studio channels mute <ch_idx> [--unmute]
+uv run fl-studio channels solo <ch_idx> [--unsolo]
+
+# Patterns commands
+uv run fl-studio patterns list
+uv run fl-studio patterns select <pat_idx>
+uv run fl-studio patterns create
+
+# Insert note or chord progression step (realtime notes)
+uv run fl-studio notes insert --pitch C4 --velocity 100 --start 0 --duration 96
+uv run fl-studio chord C4 major --velocity 100 --start 0 --duration 384
+
+# Start the FastMCP server for Claude Desktop or other MCP clients
+uv run fl-studio serve
+
+# Disconnect MIDI ports and clear saved configuration
+uv run fl-studio disconnect
 ```
 
 ---
@@ -196,7 +249,7 @@ If FL Studio doesn't respond in time, the tool returns `{"error": "TIMEOUT", "hi
 | stop | `F0 7D 02 F7` | — |
 | set_tempo | `F0 7D 03 BPM_HI BPM_LO F7` | 7-bit encoded BPM |
 | insert_notes | `F0 7D 04 [...] F7` | N × 9 bytes per note |
-| save_as | `F0 7D 05 [...] F7` | ASCII filename |
+| save | `F0 7D 05 F7` | — |
 | query_status | `F0 7D 06 F7` | — → responds 0x10 |
 | query_channels | `F0 7D 07 F7` | — → responds 0x11 |
 | set_channel_vol | `F0 7D 08 ch_idx vol F7` | both 0-127 |
@@ -205,6 +258,7 @@ If FL Studio doesn't respond in time, the tool returns `{"error": "TIMEOUT", "hi
 | query_patterns | `F0 7D 0C F7` | — → responds 0x12 |
 | mute_channel | `F0 7D 0D ch_idx is_muted F7` | is_muted: 0 or 1 |
 | solo_channel | `F0 7D 0E ch_idx is_soloed F7` | toggle semantics in FL |
+| set_channel_pan | `F0 7D 13 ch_idx pan F7` | both 0-127 |
 
 ### FL Studio → Server
 

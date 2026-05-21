@@ -46,7 +46,7 @@ CMD_PLAY             = 0x01
 CMD_STOP             = 0x02
 CMD_SET_TEMPO        = 0x03
 CMD_NOTES            = 0x04
-CMD_SAVE_AS          = 0x05
+CMD_SAVE             = 0x05
 CMD_QUERY_STATUS     = 0x06
 CMD_QUERY_CHANNELS   = 0x07
 CMD_SET_CHANNEL_VOL  = 0x08
@@ -56,13 +56,23 @@ CMD_SELECT_PATTERN   = 0x0A
 CMD_QUERY_PATTERNS   = 0x0C
 CMD_MUTE_CHANNEL     = 0x0D
 CMD_SOLO_CHANNEL     = 0x0E
-CMD_CLEAR_PATTERN    = 0x0F   # no payload — clears current pattern
+# 0x0F removed in v1.4 (patterns.clearCurrentPattern does not exist in FL API)
 CMD_SET_CHANNEL_PAN  = 0x13   # [ch_idx, pan] both 0-127; 64 = centre
+CMD_GET_NOTES        = 0x14
+CMD_SET_PATTERN_LENGTH = 0x15
+CMD_RENAME_CHANNEL   = 0x16
+CMD_RENAME_PATTERN   = 0x17
+CMD_SET_MIXER_VOL    = 0x19
+CMD_SET_MIXER_PAN    = 0x1A
+CMD_ROUTE_TO_MIXER   = 0x1B
+CMD_QUERY_MIXER_STATE = 0x1C
 
 # FL Studio → Server responses  (0x10-0x1F reserved for responses)
 RESP_STATUS   = 0x10
 RESP_CHANNELS = 0x11
 RESP_PATTERNS = 0x12
+RESP_NOTES    = 0x14
+RESP_MIXER_STATE = 0x1C
 
 # MMC device ID 0x7F = "all devices"
 _MMC_PLAY  = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x02, 0xF7])
@@ -147,13 +157,9 @@ def decode_notes(payload: list[int]) -> list[dict]:
     return notes
 
 
-def encode_save_as(filename: str) -> bytes:
-    """Encode a filename string as ASCII bytes in a CMD_SAVE_AS SysEx message."""
-    encoded = [ord(c) for c in filename]
-    for c in encoded:
-        if c > 127:
-            raise ValueError(f"Non-ASCII character in filename: chr({c})")
-    return _sysex(CMD_SAVE_AS, encoded)
+def encode_save() -> bytes:
+    """Encode a CMD_SAVE SysEx message (no payload — triggers ui.save())."""
+    return _sysex(CMD_SAVE, [])
 
 
 def decode_sysex(raw: bytes) -> tuple[int, list[int]] | None:
@@ -304,11 +310,6 @@ def encode_solo_channel(channel_idx: int, soloed: bool) -> bytes:
 # Clear pattern / channel pan
 # ---------------------------------------------------------------------------
 
-def encode_clear_pattern() -> bytes:
-    """Send CMD_CLEAR_PATTERN — erases all notes from the current pattern."""
-    return _sysex(CMD_CLEAR_PATTERN, [])
-
-
 def encode_set_channel_pan(channel_idx: int, pan: int) -> bytes:
     """Encode a set-channel-pan command.
 
@@ -320,6 +321,69 @@ def encode_set_channel_pan(channel_idx: int, pan: int) -> bytes:
     if not 0 <= pan <= 127:
         raise ValueError(f"pan must be 0-127, got {pan}")
     return _sysex(CMD_SET_CHANNEL_PAN, [channel_idx, pan])
+
+
+def encode_get_notes() -> bytes:
+    """Encode a CMD_GET_NOTES SysEx message (no payload)."""
+    return _sysex(CMD_GET_NOTES, [])
+
+
+def encode_set_pattern_length(pattern_idx: int, length_beats: int) -> bytes:
+    """Encode CMD_SET_PATTERN_LENGTH SysEx message.
+
+    Supports up to 999 patterns and 999 beats (split as 2 bytes: hi/lo 7-bit).
+    """
+    if not 0 <= pattern_idx <= 999:
+        raise ValueError(f"pattern_idx must be 0-999, got {pattern_idx}")
+    if not 1 <= length_beats <= 999:
+        raise ValueError(f"length_beats must be 1-999, got {length_beats}")
+    pat_hi = (pattern_idx >> 7) & 0x7F
+    pat_lo = pattern_idx & 0x7F
+    len_hi = (length_beats >> 7) & 0x7F
+    len_lo = length_beats & 0x7F
+    return _sysex(CMD_SET_PATTERN_LENGTH, [pat_hi, pat_lo, len_hi, len_lo])
+
+
+def encode_rename_channel(channel_idx: int, name: str) -> bytes:
+    """Encode CMD_RENAME_CHANNEL SysEx message.
+
+    Limits name to 14 characters and 7-bit ASCII.
+    """
+    if not 0 <= channel_idx <= 127:
+        raise ValueError(f"channel_idx must be 0-127, got {channel_idx}")
+    safe = [ord(c) for c in name[:14] if ord(c) <= 127]
+    return _sysex(CMD_RENAME_CHANNEL, [channel_idx, len(safe)] + safe)
+
+
+def encode_rename_pattern(pattern_idx: int, name: str) -> bytes:
+    """Encode CMD_RENAME_PATTERN SysEx message.
+
+    Supports pattern_idx up to 999 (split into pat_hi/pat_lo),
+    name limits to 14 characters and 7-bit ASCII.
+    """
+    if not 0 <= pattern_idx <= 999:
+        raise ValueError(f"pattern_idx must be 0-999, got {pattern_idx}")
+    pat_hi = (pattern_idx >> 7) & 0x7F
+    pat_lo = pattern_idx & 0x7F
+    safe = [ord(c) for c in name[:14] if ord(c) <= 127]
+    return _sysex(CMD_RENAME_PATTERN, [pat_hi, pat_lo, len(safe)] + safe)
+
+
+def decode_resp_notes(payload: list[int]) -> list[dict]:
+    """Decode RESP_NOTES payload (delegates to decode_notes)."""
+    return decode_notes(payload)
+
+
+def encode_resp_notes(notes: list[dict]) -> bytes:
+    """Encode a RESP_NOTES message (used by FL Studio script/bridge mock)."""
+    payload: list[int] = []
+    for n in notes:
+        payload.append(int(n["pitch"]) & 0x7F)
+        payload.append(int(n["velocity"]) & 0x7F)
+        payload.append(int(n["channel"]) & 0x0F)
+        payload.extend(_encode_tick(int(n["start_tick"])))
+        payload.extend(_encode_tick(int(n["duration_ticks"])))
+    return _sysex(RESP_NOTES, payload)
 
 
 # ---------------------------------------------------------------------------
@@ -338,3 +402,90 @@ def panic_messages() -> list[bytes]:
         msgs.append(bytes([status, 120, 0]))  # All Sound Off
         msgs.append(bytes([status, 121, 0]))  # Reset All Controllers
     return msgs
+
+
+# ---------------------------------------------------------------------------
+# Mixer & Routing (Sprint 4)
+# ---------------------------------------------------------------------------
+
+def encode_set_mixer_vol(track_idx: int, volume: int) -> bytes:
+    if not 0 <= track_idx <= 127:
+        raise ValueError(f"track_idx must be 0-127, got {track_idx}")
+    if not 0 <= volume <= 127:
+        raise ValueError(f"volume must be 0-127, got {volume}")
+    return _sysex(CMD_SET_MIXER_VOL, [track_idx, volume])
+
+
+def encode_set_mixer_pan(track_idx: int, pan: int) -> bytes:
+    if not 0 <= track_idx <= 127:
+        raise ValueError(f"track_idx must be 0-127, got {track_idx}")
+    if not 0 <= pan <= 127:
+        raise ValueError(f"pan must be 0-127, got {pan}")
+    return _sysex(CMD_SET_MIXER_PAN, [track_idx, pan])
+
+
+def encode_route_to_mixer(channel_idx: int, track_idx: int) -> bytes:
+    if not 0 <= channel_idx <= 127:
+        raise ValueError(f"channel_idx must be 0-127, got {channel_idx}")
+    if not 0 <= track_idx <= 127:
+        raise ValueError(f"track_idx must be 0-127, got {track_idx}")
+    return _sysex(CMD_ROUTE_TO_MIXER, [channel_idx, track_idx])
+
+
+def encode_query_mixer_state(start_track: int, end_track: int) -> bytes:
+    if not 0 <= start_track <= 127:
+        raise ValueError(f"start_track must be 0-127, got {start_track}")
+    if not 0 <= end_track <= 127:
+        raise ValueError(f"end_track must be 0-127, got {end_track}")
+    if start_track > end_track:
+        raise ValueError(f"start_track ({start_track}) cannot be greater than end_track ({end_track})")
+    if end_track - start_track >= 32:
+        raise ValueError(f"Queried range exceeds maximum of 32 tracks: {end_track - start_track + 1}")
+    return _sysex(CMD_QUERY_MIXER_STATE, [start_track, end_track])
+
+
+def decode_resp_mixer_state(payload: list[int]) -> dict:
+    if len(payload) < 3:
+        raise ValueError(f"RESP_MIXER_STATE payload too short: {len(payload)} bytes")
+    start_track = payload[0]
+    end_track = payload[1]
+    count = payload[2]
+
+    tracks = []
+    i = 3
+    while len(tracks) < count and i < len(payload):
+        if i + 3 > len(payload):
+            break
+        vol = payload[i]
+        pan = payload[i+1]
+        name_len = payload[i+2]
+        i += 3
+        if i + name_len > len(payload):
+            break
+        name_bytes = payload[i : i + name_len]
+        i += name_len
+        name = "".join(chr(b) for b in name_bytes)
+        tracks.append({
+            "volume": vol,
+            "pan": pan,
+            "name": name
+        })
+    return {
+        "start_track": start_track,
+        "end_track": end_track,
+        "tracks": tracks
+    }
+
+
+def encode_resp_mixer_state(start_track: int, end_track: int, tracks: list[dict]) -> bytes:
+    payload: list[int] = [start_track, end_track, len(tracks)]
+    for t in tracks:
+        vol = int(t.get("volume", 0)) & 0x7F
+        pan = int(t.get("pan", 64)) & 0x7F
+        name = t.get("name", "")
+        safe = [ord(c) for c in name[:14] if ord(c) <= 127]
+        payload.append(vol)
+        payload.append(pan)
+        payload.append(len(safe))
+        payload.extend(safe)
+    return _sysex(RESP_MIXER_STATE, payload)

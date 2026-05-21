@@ -1,4 +1,4 @@
-"""Tests for v2 features: note name parsing, fl_disconnect, fl_clear_pattern,
+"""Tests for v2 features: note name parsing, fl_disconnect,
 fl_set_channel_pan, queue overflow logging, concurrent query lock.
 
 All tests run in dry-run mode — no MIDI hardware required.
@@ -13,7 +13,6 @@ import pytest
 
 from fl_studio_mcp.bridge import FLStudioBridge
 from fl_studio_mcp.models import (
-    ClearPatternInput,
     DisconnectInput,
     Note,
     SetChannelPanInput,
@@ -21,7 +20,6 @@ from fl_studio_mcp.models import (
     note_name_to_pitch,
 )
 from fl_studio_mcp.protocol import (
-    encode_clear_pattern,
     encode_set_channel_pan,
 )
 
@@ -182,14 +180,10 @@ class TestChordStepRootPitch:
 
 
 # ===========================================================================
-# Protocol: encode_clear_pattern / encode_set_channel_pan
+# Protocol: encode_set_channel_pan
 # ===========================================================================
 
 class TestNewProtocol:
-    def test_clear_pattern_framing(self):
-        raw = encode_clear_pattern()
-        assert raw == bytes([0xF0, 0x7D, 0x0F, 0xF7])
-
     def test_set_channel_pan_cmd(self):
         raw = encode_set_channel_pan(3, 64)
         assert raw[2] == 0x13
@@ -252,27 +246,6 @@ class TestFlDisconnect:
         result = parse(await fn(DisconnectInput()))
         assert result["disconnected"] is True
 
-
-# ===========================================================================
-# Tool: fl_clear_pattern
-# ===========================================================================
-
-class TestFlClearPattern:
-    async def test_dry_run(self, dry_bridge):
-        fn = _tool("patterns", "fl_clear_pattern")
-        result = parse(await fn(ClearPatternInput()))
-        assert result["dry_run"] is True
-        assert result["command"] == "CLEAR_PATTERN"
-
-    async def test_sysex_bytes(self, dry_bridge):
-        fn = _tool("patterns", "fl_clear_pattern")
-        result = parse(await fn(ClearPatternInput()))
-        assert "F0 7D 0F F7" in result["would_send_bytes"]
-
-    async def test_not_connected_returns_error(self):
-        fn = _tool("patterns", "fl_clear_pattern")
-        result = parse(await fn(ClearPatternInput()))
-        assert "error" in result
 
 
 # ===========================================================================

@@ -29,12 +29,15 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def fl_insert_notes(params: InsertNotesInput) -> str:
-        """Insert one or more MIDI notes into FL Studio via custom SysEx.
+        """Play MIDI notes in FL Studio via the bridge controller script.
 
-        The FL MCP Bridge controller script receives this SysEx and attempts
-        to insert notes into the current pattern using FL Studio's Python API
-        (patterns.addNote). If that API isn't available in your FL version,
-        notes are played in realtime via channels.midiNoteOn instead.
+        The FL MCP Bridge receives this SysEx and plays notes in realtime
+        via channels.midiNoteOn(). Notes are triggered immediately — they
+        are NOT inserted into the pattern piano roll.
+
+        **To record notes into a pattern:** Enable Record mode in FL Studio's
+        transport BEFORE calling this tool. FL Studio will capture the played
+        notes into the current pattern while recording.
 
         Tick reference (FL Studio default 96 PPQ):
           - Quarter note = 96 ticks
@@ -42,6 +45,9 @@ def register(mcp: FastMCP) -> None:
           - Whole note   = 384 ticks
           - 8th note     = 48 ticks
           - 16th note    = 24 ticks
+
+        Note: start_tick and duration_ticks are encoded in the SysEx but
+        currently fire all notes simultaneously in realtime mode.
 
         Requires fl_connect to have been called first.
 
