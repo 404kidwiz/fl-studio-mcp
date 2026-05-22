@@ -66,6 +66,16 @@ from .tools import (
     hardware,
     optimization,
     release,
+    genre_fusion,
+    session_musician,
+    soundscapes,
+    vocal_cloning,
+    film_scoring,
+    psychoacoustics,
+    foley_designer,
+    live_looping,
+    humanization,
+    project_health,
 )
 
 from . import resources, prompts
@@ -135,6 +145,16 @@ generative_vocals.register(mcp)
 hardware.register(mcp)
 optimization.register(mcp)
 release.register(mcp)
+genre_fusion.register(mcp)
+session_musician.register(mcp)
+soundscapes.register(mcp)
+vocal_cloning.register(mcp)
+film_scoring.register(mcp)
+psychoacoustics.register(mcp)
+foley_designer.register(mcp)
+live_looping.register(mcp)
+humanization.register(mcp)
+project_health.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)

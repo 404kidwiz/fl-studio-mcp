@@ -25,7 +25,7 @@
 
 ## 🎼 Overwhelming Developer & Producer Power
 
-The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **81 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, and version control—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
+The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **91 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, version control, and extreme AI automation—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
 
 Whether you're looking to generate complex polyrhythms, optimize harmonic chord voicings, or automate a visual click inside Serum, the FL Studio MCP gives you full, type-safe, dry-run-capable control over your DAW.
 
@@ -221,6 +221,18 @@ FL Studio MCP exposes a massively comprehensive suite of **81 distinct tools**, 
 *   **`fl_cpu_optimizer_bounce`**: Identify high CPU VSTs and Bounce in Place.
 *   **`fl_collaborative_cloud_sync`**: Package and upload project for remote collaboration.
 *   **`fl_industry_metadata_tagger`**: Embed ISRC codes and ASCAP splits into exported WAV.
+
+#### **Phase 13: The Visionary (Tools 82 - 91)**
+*   **`fl_neuro_genre_fusion`**: Mathematically blend properties of two distinct genres.
+*   **`fl_ai_session_musician_improviser`**: Generate humanized 16-bar AI improvised solos.
+*   **`fl_dynamic_soundscape_generator`**: Create generative, multi-layered ambient beds from text.
+*   **`fl_vocal_chain_cloner`**: Clone EQ, compression, and FX chains from a reference acapella.
+*   **`fl_film_score_sync`**: Sync tension strings and impacts to specific video timecodes.
+*   **`fl_psychoacoustic_exciter`**: Maximize perceived loudness via mid-side EQ and phase manipulation.
+*   **`fl_auto_foley_foley_designer`**: Synthesize complex foley sounds from scratch via FM routing.
+*   **`fl_adaptive_live_looping`**: Setup Ableton-style auto-slice live looping with Edison.
+*   **`fl_chord_voicing_humanizer`**: Spread chord voicings and humanize strum velocities.
+*   **`fl_project_health_monitor`**: Background daemon to detect phase issues, CPU spikes, and ear fatigue.
 
 ---
 
