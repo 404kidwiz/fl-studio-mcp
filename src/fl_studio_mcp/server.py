@@ -96,6 +96,16 @@ from .tools import (
     lofi_fx,
     arrangement_mutator,
     preset_curator,
+    neural_quantizer,
+    harmonic_synth,
+    vocal_rider,
+    transient_splitter,
+    chord_voicer,
+    stereo_widener,
+    audio_harmonizer,
+    glitch_generator,
+    sidechain_carver,
+    track_sheet,
 )
 
 from . import resources, prompts
@@ -195,6 +205,16 @@ master_bus.register(mcp)
 lofi_fx.register(mcp)
 arrangement_mutator.register(mcp)
 preset_curator.register(mcp)
+neural_quantizer.register(mcp)
+harmonic_synth.register(mcp)
+vocal_rider.register(mcp)
+transient_splitter.register(mcp)
+chord_voicer.register(mcp)
+stereo_widener.register(mcp)
+audio_harmonizer.register(mcp)
+glitch_generator.register(mcp)
+sidechain_carver.register(mcp)
+track_sheet.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)

@@ -17,7 +17,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-blue?style=for-the-badge&logo=python" alt="Python Versions"/>
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-green?style=for-the-badge" alt="Platforms"/>
-  <img src="https://img.shields.io/badge/Tests-337%20Passing-success?style=for-the-badge&logo=pytest" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-383%20Passing-success?style=for-the-badge&logo=pytest" alt="Tests"/>
   <img src="https://img.shields.io/badge/License-MIT-orange?style=for-the-badge" alt="License"/>
 </p>
 
@@ -25,7 +25,7 @@
 
 ## 🎼 Overwhelming Developer & Producer Power
 
-The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **111 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, version control, and extreme AI automation—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
+The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **121 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, version control, and extreme AI automation—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
 
 Whether you're looking to generate complex polyrhythms, optimize harmonic chord voicings, or automate a visual click inside Serum, the FL Studio MCP gives you full, type-safe, dry-run-capable control over your DAW.
 
@@ -257,6 +257,18 @@ FL Studio MCP exposes a massively comprehensive suite of **111 distinct tools**,
 *   **`fl_lofi_degradation_matrix`**: Apply automated tape wow, flutter, and vinyl crackle routed via parallel.
 *   **`fl_song_structure_mutator`**: Algorithmic rearrangement of Playlist blocks to IDM/Glitch hop sequence.
 *   **`fl_vst_preset_ai_curator`**: Scan local .fst libraries and NLP tag presets for instant loading.
+
+#### **Phase 16: The Virtuoso (Tools 112 - 121)**
+*   **`fl_neural_rhythm_quantizer`**: Extract timing/groove swing and velocity maps from live audio to create custom FL Groove Templates.
+*   **`fl_sub_bass_harmonic_synthesizer`**: Automatically generate matching sub-bass MIDI patterns with custom harmonic saturation.
+*   **`fl_dynamic_vocal_rider`**: Balance vocal levels against instrumental mixes using fine-grained volume automation curves.
+*   **`fl_intelligent_transient_splitter`**: Split audio signals into separate Transient and Sustain channels routed to parallel mixer tracks.
+*   **`fl_chord_progression_voicer`**: Voice MIDI chord progressions automatically using standard keyboard voice-leading rules.
+*   **`fl_multiband_stereo_widener_matrix`**: Split signals into Low (mono), Mid (Haas-widened), and High (delay-widened) frequency bands.
+*   **`fl_polyphonic_midi_to_audio_harmonizer`**: Generate multi-part backing harmonies from vocal audio tracks and MIDI chord patterns.
+*   **`fl_resampler_glitch_generator`**: Bounce playlist regions to audio, load them into Slicex/Granulizer, and randomize parameters for glitch fills.
+*   **`fl_intelligent_sidechain_carver`**: Set up dynamic frequency-specific sidechain ducking centered around target Low bands.
+*   **`fl_ai_track_sheet_generator`**: Auto-scan project layout and compile a professional markdown/HTML tracking sheet.
 
 ---
 
