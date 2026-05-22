@@ -25,7 +25,7 @@
 
 ## 🎼 Overwhelming Developer & Producer Power
 
-The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **91 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, version control, and extreme AI automation—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
+The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **101 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, version control, and extreme AI automation—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
 
 Whether you're looking to generate complex polyrhythms, optimize harmonic chord voicings, or automate a visual click inside Serum, the FL Studio MCP gives you full, type-safe, dry-run-capable control over your DAW.
 
@@ -70,9 +70,9 @@ The codebase is highly modular and strictly structured:
 
 ---
 
-## 🧰 The Toolkit (81 Tools)
+## 🧰 The Toolkit (101 Tools)
 
-FL Studio MCP exposes a massively comprehensive suite of **81 distinct tools**, broken down by production phase:
+FL Studio MCP exposes a massively comprehensive suite of **101 distinct tools**, broken down by production phase:
 
 ### 1. Connection & Diagnostics (3)
 | Tool Name | Description | Needs Bridge Script |
@@ -233,6 +233,18 @@ FL Studio MCP exposes a massively comprehensive suite of **81 distinct tools**, 
 *   **`fl_adaptive_live_looping`**: Setup Ableton-style auto-slice live looping with Edison.
 *   **`fl_chord_voicing_humanizer`**: Spread chord voicings and humanize strum velocities.
 *   **`fl_project_health_monitor`**: Background daemon to detect phase issues, CPU spikes, and ear fatigue.
+
+#### **Phase 14: The Architect (Tools 92 - 101)**
+*   **`fl_macro_arrangement_builder`**: Place arrangement markers and dummy blocks from structural text.
+*   **`fl_vocal_chop_kaleidoscope`**: Slice transients and generate glitchy, key-locked rhythmic sequences.
+*   **`fl_polyphonic_bass_extractor`**: Extract low-end sub frequencies from complex loops to MIDI.
+*   **`fl_auto_gain_staging_assistant`**: Normalize mixer faders to a pink-noise reference curve (-18dBFS).
+*   **`fl_drum_pattern_euclidean`**: Generate complex polyrhythmic grooves via Euclidean math.
+*   **`fl_sidechain_matrix_wizard`**: Route all bass/synths to a Ghost Kick channel automatically.
+*   **`fl_generative_transition_fx`**: Synthesize risers, sweeps, and drops automatically before song sections.
+*   **`fl_hardware_synth_patch_dumper`**: Bridge SysEx to pull and save patches from external hardware gear.
+*   **`fl_plugin_latency_compensator`**: Auto-detect and fix manual track delays for PDC phase smearing.
+*   **`fl_holographic_mixer_ui`**: Build a Patcher dashboard of the top 10 most-automated project parameters.
 
 ---
 

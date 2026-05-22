@@ -76,6 +76,16 @@ from .tools import (
     live_looping,
     humanization,
     project_health,
+    arrangement_builder,
+    vocal_chops,
+    audio_extraction,
+    gain_staging,
+    euclidean_drums,
+    routing_wizard,
+    transition_fx,
+    hardware_midi,
+    latency,
+    custom_ui,
 )
 
 from . import resources, prompts
@@ -155,6 +165,16 @@ foley_designer.register(mcp)
 live_looping.register(mcp)
 humanization.register(mcp)
 project_health.register(mcp)
+arrangement_builder.register(mcp)
+vocal_chops.register(mcp)
+audio_extraction.register(mcp)
+gain_staging.register(mcp)
+euclidean_drums.register(mcp)
+routing_wizard.register(mcp)
+transition_fx.register(mcp)
+hardware_midi.register(mcp)
+latency.register(mcp)
+custom_ui.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)
