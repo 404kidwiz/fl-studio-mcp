@@ -62,10 +62,13 @@ CMD_GET_NOTES        = 0x14
 CMD_SET_PATTERN_LENGTH = 0x15
 CMD_RENAME_CHANNEL   = 0x16
 CMD_RENAME_PATTERN   = 0x17
+CMD_PING             = 0x18
 CMD_SET_MIXER_VOL    = 0x19
 CMD_SET_MIXER_PAN    = 0x1A
 CMD_ROUTE_TO_MIXER   = 0x1B
 CMD_QUERY_MIXER_STATE = 0x1C
+CMD_UNDO             = 0x1D
+CMD_REDO             = 0x1E
 
 # FL Studio → Server responses  (0x10-0x1F reserved for responses)
 RESP_STATUS   = 0x10
@@ -73,6 +76,7 @@ RESP_CHANNELS = 0x11
 RESP_PATTERNS = 0x12
 RESP_NOTES    = 0x14
 RESP_MIXER_STATE = 0x1C
+RESP_ACK      = 0x1F
 
 # MMC device ID 0x7F = "all devices"
 _MMC_PLAY  = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x02, 0xF7])
@@ -489,3 +493,27 @@ def encode_resp_mixer_state(start_track: int, end_track: int, tracks: list[dict]
         payload.append(len(safe))
         payload.extend(safe)
     return _sysex(RESP_MIXER_STATE, payload)
+
+
+def encode_undo() -> bytes:
+    return _sysex(CMD_UNDO, [])
+
+
+def encode_redo() -> bytes:
+    return _sysex(CMD_REDO, [])
+
+
+def encode_ping(challenge: int) -> bytes:
+    if not 0 <= challenge <= 127:
+        raise ValueError(f"challenge must be 0-127, got {challenge}")
+    return _sysex(CMD_PING, [challenge])
+
+
+def decode_resp_ack(payload: list[int]) -> int:
+    if not payload:
+        raise ValueError("RESP_ACK payload is empty")
+    return payload[0]
+
+
+def encode_resp_ack(cmd_byte: int) -> bytes:
+    return _sysex(RESP_ACK, [cmd_byte & 0x7F])

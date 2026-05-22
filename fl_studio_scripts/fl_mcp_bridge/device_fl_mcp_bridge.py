@@ -91,16 +91,20 @@ CMD_GET_NOTES        = 0x14
 CMD_SET_PATTERN_LENGTH = 0x15
 CMD_RENAME_CHANNEL   = 0x16
 CMD_RENAME_PATTERN   = 0x17
+CMD_PING             = 0x18
 CMD_SET_MIXER_VOL    = 0x19
 CMD_SET_MIXER_PAN    = 0x1A
 CMD_ROUTE_TO_MIXER   = 0x1B
 CMD_QUERY_MIXER_STATE = 0x1C
+CMD_UNDO             = 0x1D
+CMD_REDO             = 0x1E
 
 RESP_STATUS   = 0x10
 RESP_CHANNELS = 0x11
 RESP_PATTERNS = 0x12
 RESP_NOTES    = 0x14
 RESP_MIXER_STATE = 0x1C
+RESP_ACK      = 0x1F
 
 # Session-level notes cache mapping pattern index -> list of note bytes
 notes_cache = {}
@@ -163,15 +167,28 @@ def OnSysEx(event):
         CMD_SET_PATTERN_LENGTH: lambda: _cmd_set_pattern_length(payload),
         CMD_RENAME_CHANNEL:     lambda: _cmd_rename_channel(payload),
         CMD_RENAME_PATTERN:     lambda: _cmd_rename_pattern(payload),
+        CMD_PING:               lambda: _cmd_ping(payload),
         CMD_SET_MIXER_VOL:      lambda: _cmd_set_mixer_vol(payload),
         CMD_SET_MIXER_PAN:      lambda: _cmd_set_mixer_pan(payload),
         CMD_ROUTE_TO_MIXER:     lambda: _cmd_route_to_mixer(payload),
         CMD_QUERY_MIXER_STATE:  lambda: _cmd_query_mixer_state(payload),
+        CMD_UNDO:               lambda: _cmd_undo(),
+        CMD_REDO:               lambda: _cmd_redo(),
     }
 
     handler = dispatch.get(cmd)
     if handler:
         handler()
+        queries_and_pings = {
+            CMD_QUERY_STATUS,
+            CMD_QUERY_CHANNELS,
+            CMD_QUERY_PATTERNS,
+            CMD_GET_NOTES,
+            CMD_QUERY_MIXER_STATE,
+            CMD_PING,
+        }
+        if cmd not in queries_and_pings:
+            _send_sysex(RESP_ACK, [cmd])
     else:
         print(f"[FL MCP Bridge] Unknown command: {cmd:#x}")
 
@@ -614,4 +631,29 @@ def _cmd_query_mixer_state(payload):
         
     _send_sysex(RESP_MIXER_STATE, response_payload)
     print(f"[FL MCP Bridge] Mixer state → sent tracks {start_track}-{end_track}")
+
+
+def _cmd_undo():
+    try:
+        general.undoUp()
+        print("[FL MCP Bridge] Undo")
+    except Exception as exc:
+        print(f"[FL MCP Bridge] Undo failed: {exc}")
+
+
+def _cmd_redo():
+    try:
+        general.undoDown()
+        print("[FL MCP Bridge] Redo")
+    except Exception as exc:
+        print(f"[FL MCP Bridge] Redo failed: {exc}")
+
+
+def _cmd_ping(payload):
+    if not payload:
+        print("[FL MCP Bridge] Ping: no challenge payload")
+        return
+    # Echo back challenge byte
+    _send_sysex(CMD_PING, payload)
+    print(f"[FL MCP Bridge] Ping response sent for challenge {payload[0]}")
 

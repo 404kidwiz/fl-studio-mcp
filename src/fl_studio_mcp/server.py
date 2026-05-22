@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .tools import (
     channels,
+    composition,
     connection,
     library,
     midi_ports,
@@ -27,7 +28,12 @@ from .tools import (
     tempo,
     transport_control,
     vst_scanner,
+    gui_automation,
+    presets,
+    algorithmic,
 )
+
+from . import resources, prompts
 
 mcp = FastMCP(
     "fl_studio_mcp",
@@ -64,6 +70,15 @@ mixing.register(mcp)
 vst_scanner.register(mcp)
 library.register(mcp)
 pattern_control.register(mcp)
+composition.register(mcp)
+gui_automation.register(mcp)
+presets.register(mcp)
+algorithmic.register(mcp)
+
+# Register resources and prompts
+resources.register(mcp)
+prompts.register(mcp)
+
 
 
 def main() -> None:

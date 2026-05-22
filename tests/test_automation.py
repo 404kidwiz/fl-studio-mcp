@@ -15,6 +15,7 @@ from fl_studio_mcp.tools.vst_scanner import (
     register as register_vst
 )
 from fl_studio_mcp.tools.library import scan_user_library, register as register_library
+from fl_studio_mcp.tools.gui_automation import register as register_gui
 
 def test_automation_factory():
     """Test that the automation factory returns the correct class per platform."""
@@ -65,6 +66,26 @@ def test_macos_automation_methods():
             check=False
         )
 
+        # Test click_at
+        assert auto.click_at(100, 200, delay_ms=0) is True
+        args = mock_run.call_args[0][0]
+        assert "click at {100, 200}" in args[2]
+
+        # Test reset_ui
+        assert auto.reset_ui() is True
+        args = mock_run.call_args[0][0]
+        assert "key code 4 using {shift down, command down}" in args[2]
+
+        # Test dismiss_popup confirm
+        assert auto.dismiss_popup("confirm") is True
+        args = mock_run.call_args[0][0]
+        assert "key code 36" in args[2]
+
+        # Test dismiss_popup cancel
+        assert auto.dismiss_popup("cancel") is True
+        args = mock_run.call_args[0][0]
+        assert "key code 53" in args[2]
+
 def test_windows_automation_methods():
     """Test WindowsAutomation VBScript generation and cscript execution."""
     auto = WindowsAutomation()
@@ -89,6 +110,8 @@ def test_windows_automation_methods():
             ["cscript", "//nologo", "temp.vbs"],
             capture_output=True,
             text=True,
+            errors="replace",
+            timeout=5.0,
             check=False
         )
         mock_remove.assert_called_with("temp.vbs")
@@ -99,6 +122,30 @@ def test_windows_automation_methods():
         assert "SendKeys \"Harmless\"" in mock_file.write.call_args[0][0]
         assert "SendKeys \"{F8}\"" in mock_file.write.call_args[0][0]
         assert "SendKeys \"{ENTER}\"" in mock_file.write.call_args[0][0]
+
+        # Test click_at
+        mock_run.reset_mock()
+        assert auto.click_at(150, 250, delay_ms=50) is True
+        assert mock_run.call_args[0][0][0] == "powershell"
+        ps_cmd = mock_run.call_args[0][0][5]
+        assert "150" in ps_cmd
+        assert "250" in ps_cmd
+        assert "Start-Sleep -Milliseconds 50" in ps_cmd
+
+        # Test reset_ui
+        mock_file.reset_mock()
+        assert auto.reset_ui() is True
+        assert "SendKeys \"^+H\"" in mock_file.write.call_args[0][0]
+
+        # Test dismiss_popup confirm
+        mock_file.reset_mock()
+        assert auto.dismiss_popup("confirm") is True
+        assert "SendKeys \"{ENTER}\"" in mock_file.write.call_args[0][0]
+
+        # Test dismiss_popup cancel
+        mock_file.reset_mock()
+        assert auto.dismiss_popup("cancel") is True
+        assert "SendKeys \"{ESC}\"" in mock_file.write.call_args[0][0]
 
 def test_windows_open_file():
     """Test WindowsAutomation open_file handles os.startfile or cmd shell fallback."""
@@ -193,10 +240,14 @@ async def test_tools_registration():
     mcp = FastMCP("test_mcp")
     register_vst(mcp)
     register_library(mcp)
+    register_gui(mcp)
 
     tools = getattr(mcp, "_tools", None) or getattr(mcp._tool_manager, "_tools", {})
     assert "fl_list_installed_plugins" in tools
     assert "fl_load_plugin" in tools
     assert "fl_list_library" in tools
     assert "fl_load_file" in tools
+    assert "fl_click_at" in tools
+    assert "fl_reset_ui" in tools
+    assert "fl_dismiss_popup" in tools
 

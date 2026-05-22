@@ -4,7 +4,7 @@ from mcp.server.fastmcp import FastMCP
 
 from ..bridge import FLStudioBridge, format_result
 from ..errors import FLMCPError
-from ..models import ConnectInput, DisconnectInput
+from ..models import ConnectInput, DisconnectInput, PingInput
 
 
 def register(mcp: FastMCP) -> None:
@@ -91,3 +91,74 @@ def register(mcp: FastMCP) -> None:
         bridge = FLStudioBridge.get()
         bridge.disconnect()
         return format_result({**bridge.status(), "disconnected": True})
+
+    @mcp.tool(
+        name="fl_ping",
+        annotations={
+            "title": "Ping FL Studio",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def fl_ping(params: PingInput) -> str:
+        """Send a lightweight ping to FL Studio to verify connection and script responsiveness.
+
+        Sends CMD_PING (0x18) with a challenge byte, and waits for a matching pong response.
+        If the connection is stale or non-responsive, raises a TIMEOUT error.
+
+        Args:
+            params (PingInput):
+                - challenge (int): Challenge byte (0-127). Defaults to 42.
+                - timeout_ms (int): Response timeout in milliseconds. Defaults to 1000.
+
+        Returns:
+            str: JSON with keys:
+                - success (bool)
+                - challenge (int)
+                - response_time_ms (float)
+        """
+        import time
+        from ..protocol import encode_ping, CMD_PING
+        from ..errors import ErrorCode
+
+        bridge = FLStudioBridge.get()
+        if bridge.dry_run:
+            return format_result({
+                "dry_run": True,
+                "success": True,
+                "challenge": params.challenge,
+                "response_time_ms": 0.0,
+            })
+
+        try:
+            start_time = time.monotonic()
+            pong = await bridge.query(
+                encode_ping(params.challenge),
+                expected_cmd=CMD_PING,
+                timeout_ms=params.timeout_ms,
+            )
+            if pong is None:
+                raise FLMCPError(
+                    ErrorCode.TIMEOUT,
+                    f"Ping challenge {params.challenge} timed out after {params.timeout_ms}ms.",
+                    {"challenge": params.challenge, "timeout_ms": params.timeout_ms}
+                )
+
+            payload = pong.get("payload", [])
+            if not payload or payload[0] != params.challenge:
+                raise FLMCPError(
+                    ErrorCode.UNKNOWN,
+                    f"Ping challenge verification failed: expected {params.challenge}, got {payload}",
+                    {"expected": params.challenge, "got": payload}
+                )
+
+            elapsed = (time.monotonic() - start_time) * 1000.0
+            return format_result({
+                "success": True,
+                "challenge": params.challenge,
+                "response_time_ms": round(elapsed, 2),
+            })
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())

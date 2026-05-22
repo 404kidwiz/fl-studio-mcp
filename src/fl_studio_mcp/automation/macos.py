@@ -77,3 +77,37 @@ class MacOSAutomation(GUIAutomation):
             return res.returncode == 0
         except Exception:
             return False
+
+    def click_at(self, x: int, y: int, delay_ms: int = 100) -> bool:
+        if not self.focus_fl_studio():
+            return False
+        if delay_ms > 0:
+            time.sleep(delay_ms / 1000.0)
+        script = (
+            'tell application "System Events"\n'
+            f'    click at {{{x}, {y}}}\n'
+            'end tell'
+        )
+        return self._run_applescript(script)
+
+    def reset_ui(self, layout: str = "default") -> bool:
+        if not self.focus_fl_studio():
+            return False
+        script = (
+            'tell application "System Events"\n'
+            '    key code 4 using {shift down, command down}\n'
+            'end tell'
+        )
+        return self._run_applescript(script)
+
+    def dismiss_popup(self, action: str = "confirm") -> bool:
+        if not self.focus_fl_studio():
+            return False
+        code = 36 if action == "confirm" else 53
+        script = (
+            'tell application "System Events"\n'
+            f'    key code {code}\n'
+            'end tell'
+        )
+        return self._run_applescript(script)
+

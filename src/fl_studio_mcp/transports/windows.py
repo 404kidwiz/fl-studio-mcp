@@ -9,6 +9,7 @@ This module is intentionally minimal for v1. Tool interfaces are identical to
 macOS — only port discovery logic differs. Swap in when targeting Windows.
 """
 
+import os
 import mido
 import mido.backends.rtmidi  # noqa: F401
 
@@ -36,4 +37,4 @@ class WindowsMIDITransport(MIDITransport):
 
     @property
     def default_output_hint(self) -> str:
-        return self._LOOP_MIDI_HINT
+        return os.environ.get("FL_MCP_PORT", self._LOOP_MIDI_HINT)

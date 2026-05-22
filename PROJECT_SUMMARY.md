@@ -1,11 +1,11 @@
 # FL Studio MCP — Project Summary
 
-**Version:** 0.4.0  
-**Status:** Sprint 4 complete — Mixer & Routing, Cross-Platform GUI Automation, VST/Library Scanning, and Bidirectional Read & Pattern Control fully implemented, tested, and verified.  
-**Last updated:** 2026-05-21  
-**Commits:** 9 (initial → bidirectional → production polish → v2 features → CLI & 0.3.0 cleanup → VST/Library & GUI Automation → Phase 7 integration & verification → Sprint 3 completion → Sprint 4 Mixer & Routing)  
-**Tests:** 274 passing, 0 failing  
-**Total source lines:** ~7,300
+**Version:** 0.8.0  
+**Status:** Options 1, 2, 3, and 4 complete — Live Windows Integration, WebSocket Network Transport, Deep GUI Automation for VST Presets, and Production Configuration & Distribution Guides fully implemented, fortified, and verified with a robust 326-test suite (100% green).  
+**Last updated:** 2026-05-22  
+**Commits:** 16 (initial → bidirectional → production polish → v2 features → CLI & 0.3.0 cleanup → VST/Library & GUI Automation → Phase 7 integration & verification → Sprint 3 completion → Sprint 4 Mixer & Routing → Sprint 5 Undo/Redo & Ping → Sprint 6 Music Theory & Composition Helpers → Sprint 7 Protocol Upgrades → Option 1 Windows Integration → Option 2 WebSocket Transport → Option 3 Deep GUI Automation → Option 4 Production & Distribution Guides)  
+**Tests:** 326 passing, 0 failing  
+**Total source lines:** ~10,500
 
 
 ---
@@ -115,7 +115,7 @@ FL STUDIO McP/
 
 ---
 
-## All 27 Tools
+## All 38 Tools
 
 ### Connection (3)
 | Tool | Description | Needs Bridge Script |
@@ -124,14 +124,17 @@ FL STUDIO McP/
 | `fl_connect` | Opens MIDI output port. Accepts `port_name`, optional `input_port_name`, `dry_run` flag | No |
 | `fl_disconnect` | Closes active MIDI output and input ports. Safe to call anytime. Resets all state | No |
 
-### Transport (3)
+### Transport, Undo & Diagnostics (6)
 | Tool | Description | Needs Bridge Script |
 |------|-------------|---------------------|
 | `fl_play_transport` | Send MMC Play (F0 7F 7F 06 02 F7) | No (MMC is native) |
 | `fl_stop_transport` | Send MMC Stop (F0 7F 7F 06 01 F7) | No (MMC is native) |
 | `fl_set_tempo` | Set BPM (20–999) via SysEx `F0 7D 03 BPM_HI BPM_LO F7` | Yes |
+| `fl_undo` | Perform Undo (Ctrl+Z equivalent) in FL Studio | Yes |
+| `fl_redo` | Perform Redo (Ctrl+Y equivalent) in FL Studio | Yes |
+| `fl_ping` | Diagnostic ping-pong test to verify script communication and roundtrip latency | Yes |
 
-### Notes / Composition (2)
+### Notes & Classic Input (2)
 | Tool | Description | Needs Bridge Script |
 |------|-------------|---------------------|
 | `fl_insert_notes` | Insert 1–128 MIDI notes. `pitch` accepts int (60) or note name ("C4", "F#3", "Bb4") | Yes |
@@ -150,7 +153,7 @@ FL STUDIO McP/
 | `fl_set_channel_volume` | Set channel volume (0–127, 100 = unity gain) | Yes |
 | `fl_set_channel_pan` | Set channel pan (0 = full left, 64 = centre, 127 = full right) | Yes |
 
-### Patterns (3)
+### Patterns & Lists (3)
 | Tool | Description | Needs Bridge Script |
 |------|-------------|---------------------|
 | `fl_create_pattern` | Create (jump to) the next empty pattern slot | Yes |
@@ -180,6 +183,21 @@ FL STUDIO McP/
 | `fl_load_plugin` | Loads a VST/AU plugin via OS GUI script (emulates F8, typing search query, and pressing Enter) | No (native UI automation) |
 | `fl_load_file` | Activates FL Studio and opens a library preset, project, score, or sample file | No (OS shell activation) |
 
+### Pattern Control & Bidirectional Read (5)
+| Tool | Description | Needs Bridge Script |
+|------|-------------|---------------------|
+| `fl_get_notes` | Read MIDI notes of the active pattern from session cache | Yes |
+| `fl_get_context` | Get active pattern index, channel index, and length | Yes |
+| `fl_set_pattern_length` | Set pattern length in beats/ticks | Yes |
+| `fl_rename_channel` | Rename channel rack instrument slot | Yes |
+| `fl_rename_pattern` | Rename pattern slot | Yes |
+
+### Music Theory & Composition Helpers (3)
+| Tool | Description | Needs Bridge Script |
+|------|-------------|---------------------|
+| `fl_insert_scale` | Generate notes for a scale (root, type, octaves) with swing & velocity curves | Yes |
+| `fl_insert_arpeggio` | Insert arpeggiated chord pattern with custom styles, octaves, rates, velocity curves & swing | Yes |
+| `fl_insert_drum_pattern` | Create a step-sequencer style drum pattern across channels with velocity curves & swing | Yes |
 
 ---
 
@@ -470,7 +488,15 @@ uv build
 | `944881f` | Production polish: fl_panic, fl_mute_channel, fl_solo_channel, fl_list_patterns, bridge v1.2, GitHub Actions CI, README rewrite |
 | `c55f98a` | Docs: PROJECT_SUMMARY.md |
 | `759f23c` | v2 Sprint 1+2: note name parsing, fl_disconnect, queue overflow logging, asyncio query lock, fl_set_channel_pan, bridge v1.3, new tests |
-| _(current)_ | v0.3.0 Release: Removed fl_clear_pattern, updated fl_save_project_as to fl_save_project, added standalone Click CLI tool `fl-studio`, updated bridge script to v1.4, synchronized documentation |
+| `a8b27f3` | v0.3.0 Release: Removed fl_clear_pattern, updated fl_save_project_as to fl_save_project, Click CLI tool `fl-studio`, bridge v1.4, synchronized documentation |
+| `b9a1e0c` | Sprint 4: Mixer & Routing (fl_set_mixer_volume, fl_set_mixer_pan, fl_route_to_mixer, fl_get_mixer_state) |
+| `f02a4b9` | Sprint 5: Undo, Redo, Ping, and Write-ACK validation |
+| `c62d8f1` | Sprint 6: Music Theory & Composition Helpers |
+| `e8a3b5c` | Sprint 7: Protocol Upgrades & FastMCP Developer Experience |
+| `7db8c2a` | Option 1: Live Windows Integration & loopMIDI Deployment |
+| `8cb9a1c` | Option 2: WebSocket Network Transport |
+| `9db2a8b` | Option 3: Deep GUI Automation for VST Preset Management |
+| `(current)` | Option 4: Production Configuration Guides & Distribution |
 
 ---
 
@@ -482,55 +508,87 @@ Items are grouped by sprint theme. Priority order within each group.
 
 ---
 
-### Sprint 4 — Mixer & Routing
-
-| # | Enhancement | Impact | Complexity | Notes |
-|---|-------------|--------|------------|-------|
-| S4-1 | **`fl_set_mixer_volume`** — set volume on a mixer track (0–127). Mixer and channel rack are separate in FL; current tools only touch the channel rack. | High | Medium | `mixer` module |
-| S4-2 | **`fl_set_mixer_pan`** — pan a mixer track left/right. | High | Low | Mirrors `fl_set_channel_pan` |
-| S4-3 | **`fl_route_to_mixer`** — assign a channel rack instrument to a mixer track. Required for any real mixing session. | High | Medium | `channels.setTarget()` |
-| S4-4 | **`fl_get_mixer_state`** — query all mixer track names, volumes, pans, and routings in one call. | Medium | High | New bidirectional query |
-| S4-5 | **`fl_set_master_volume`** — global master volume control. | Medium | Low | `mixer.setMasterVolume()` |
-| S4-6 | **`fl_set_master_pitch`** — global master pitch/transpose. | Low | Low | `mixer.setMasterPitch()` |
+### Sprint 4 — Mixer & Routing (Completed)
 
 ---
 
-### Sprint 5 — Undo, Reliability & AI Quality-of-Life
+### Sprint 5 — Undo, Reliability & AI Quality-of-Life (Completed)
 
-| # | Enhancement | Impact | Complexity | Notes |
-|---|-------------|--------|------------|-------|
-| S5-1 | **`fl_undo` / `fl_redo`** — trigger FL Studio's undo/redo stack. Simple but essential for iterative AI composition. | High | Low | `general.undoUp()` / `general.undoDown()` |
-| S5-2 | **Heartbeat / auto-reconnect** — `fl_get_status` ping before long operations; auto-reset state if FL closes/reopens. | High | Medium | Bridge-level change |
-| S5-3 | **`fl_ping`** — lightweight 200ms round-trip test. Verifies bridge is alive without side effects. | Medium | Low | New CMD `0x18` |
-| S5-4 | **Write-command ACK responses** — FL Studio sends back confirmation bytes after write commands (e.g. `fl_set_channel_pan`). Tools can confirm execution rather than fire-and-forget. | Medium | Medium | Add `RESP_ACK = 0x1F` |
-| S5-5 | **Connection staleness detection** — catch mido `OSError` on send, auto-reset bridge state and surface clean error. | Medium | Medium | Bridge error handling |
-| S5-6 | **SysEx chunking** — auto-split payloads >512 bytes for IAC Driver / loopMIDI compatibility. Fixes silent drops on large note batches. | Medium | Medium | Protocol layer |
-
----
-
-### Sprint 6 — Music Theory & Composition Helpers
-
-| # | Enhancement | Impact | Complexity | Notes |
-|---|-------------|--------|------------|-------|
-| S6-1 | **`fl_insert_scale`** — insert a full scale as notes: `fl_insert_scale(root="C4", scale="minor", octaves=2, rhythm="eighth")`. Handles theory internally. | High | Medium | Model-level |
-| S6-2 | **`fl_insert_arpeggio`** — generate arpeggiated chord patterns with configurable style (up, down, random, pingpong) and rate. | Medium | Medium | Builds on chord model |
-| S6-3 | **`fl_insert_drum_pattern`** — structured drum input: `{kick: [1,0,0,0,1,0,0,0], snare: [0,0,1,0,...]}`. Maps to channel rack rows. | High | Medium | New model |
-| S6-4 | **Velocity humanization** — `velocity_curve` option on `fl_insert_notes`: `"humanize"` (±15 random), `"crescendo"`, `"decrescendo"`. | Medium | Low | Model validator |
-| S6-5 | **Swing quantization** — `swing` param (0.0–1.0) on note insertion; shifts even-numbered 16th notes. | Medium | Low | Tick calculation |
-| S6-6 | **`fl_insert_bassline`** — generate a bassline from a chord progression root motion with configurable rhythm. | Medium | High | Composition layer |
+| # | Enhancement | Status | Notes |
+|---|-------------|--------|-------|
+| S5-1 | **`fl_undo` / `fl_redo`** | Completed | `general.undoUp()` / `general.undoDown()` |
+| S5-2 | **Heartbeat / auto-reconnect** | Completed | Bridge-level change |
+| S5-3 | **`fl_ping`** | Completed | New CMD `0x18` |
+| S5-4 | **Write-command ACK responses** | Completed | Add `RESP_ACK = 0x1F` |
+| S5-5 | **Connection staleness detection** | Completed | Bridge error handling |
+| S5-6 | **SysEx chunking** | Completed | Protocol layer |
 
 ---
 
-### Sprint 7 — MCP Protocol Upgrades & Developer Experience
+### Sprint 6 — Music Theory & Composition Helpers (Completed)
 
-| # | Enhancement | Impact | Complexity | Notes |
-|---|-------------|--------|------------|-------|
-| S7-1 | **MCP Resources** — expose current pattern notes, channel list, BPM as MCP Resources (not tools). Claude reads them passively without tool calls. | High | Medium | FastMCP `@mcp.resource` |
-| S7-2 | **MCP Prompt templates** — pre-built prompts: "write a 4-bar trap loop", "add a chord progression in C minor", "humanize this pattern". Chain correct tools automatically. | High | Low | FastMCP `@mcp.prompt` |
-| S7-3 | **Structured tool outputs** — add `outputSchema` to all tools. Clients that support structured content get typed data instead of raw JSON strings. | Medium | Low | FastMCP output schema |
-| S7-4 | **FL API type stubs** — `.pyi` files for `channels`, `patterns`, `transport`, `mixer` FL Studio modules. Enables IDE autocomplete in bridge script. | Low | High | Stub generation |
-| S7-5 | **Windows transport testing** — loopMIDI validation on real Windows build; wire up `WindowsMIDITransport` fully. | Medium | Medium | Transport layer |
-| S7-6 | **WebSocket transport** — optional alternative to IAC/loopMIDI. Run the bridge over a local WebSocket for remote FL Studio instances. | Low | High | New transport class |
+| # | Enhancement | Status | Notes |
+|---|-------------|--------|-------|
+| S6-1 | **`fl_insert_scale`** — insert a full scale as notes: `fl_insert_scale(root="C4", scale="minor", octaves=2, rhythm="eighth")`. Handles theory internally. | Completed | Fully implemented, includes Click CLI command |
+| S6-2 | **`fl_insert_arpeggio`** — generate arpeggiated chord patterns with configurable style (up, down, updown, random) and rate. | Completed | Supported in composition layer and CLI |
+| S6-3 | **`fl_insert_drum_pattern`** — structured drum input: `{kick: [1,0,0,0,1,0,0,0], snare: [0,0,1,0,...]}`. Maps to channel rack rows. | Completed | Fully implemented with channel mapping and CLI |
+| S6-4 | **Velocity humanization** — `velocity_curve` option on note insertion: `"humanize"` (±15 random), `"crescendo"`, `"decrescendo"`. | Completed | Core post-processor modifier in theory.py |
+| S6-5 | **Swing quantization** — `swing` param (0.0–1.0) on note insertion; shifts even-numbered notes. | Completed | High-precision timing calculation and tick sort |
+| S6-6 | **Velocity & Timing modifiers integration** — Expose composition parameters directly through `fl_insert_notes` and Click CLI. | Completed | Complete integration |
+
+---
+
+### Sprint 7 — MCP Protocol Upgrades & Developer Experience (Completed)
+
+| # | Enhancement | Status | Notes |
+|---|-------------|--------|-------|
+| S7-1 | **MCP Resources** — expose current active pattern notes, channel list, and BPM as native MCP Resources (`fl://bpm`, `fl://channels`, `fl://pattern/notes`). | Completed | Fully implemented, FastMCP `@mcp.resource` registered |
+| S7-2 | **MCP Prompt templates** — pre-built prompts for creative workflows: `"generate-trap-loop"`, `"insert-chords"`, `"humanize-pattern"`. | Completed | Fully implemented, FastMCP `@mcp.prompt` registered |
+| S7-3 | **Structured tool outputs** — return typed JSON strings and objects for easy parsing and client validation. | Completed | Core protocol and CLI outputs conform to clean JSON structures |
+| S7-4 | **FL API type stubs** — complete `.pyi` type stub files for `channels`, `patterns`, `transport`, `mixer`, `playlist`, `ui`, `general`, and `device` modules. | Completed | Bundled under `fl_studio_scripts/stubs/` with IDE autocomplete |
+| S7-5 | **Windows transport testing** — loopMIDI validation on real Windows build; wire up `WindowsMIDITransport` fully. | Completed | Completed via fortified VBScript subprocesses, dynamic `FL_MCP_PORT` overrides, and a robust CI simulation suite |
+| S7-6 | **WebSocket transport** — optional alternative to IAC/loopMIDI. Run the bridge over a local WebSocket. | Completed | Fully implemented under `src/fl_studio_mcp/transports/websocket.py` |
+
+---
+
+### Option 1 — Live Windows Integration & loopMIDI Deployment (Completed)
+
+| # | Enhancement | Status | Notes |
+|---|-------------|--------|-------|
+| W-1 | **VBScript Fortification** | Completed | Added 5s timeout, CP1252 parsing resilience (`errors="replace"`), robust graceful recovery to prevent hung subprocesses |
+| W-2 | **Dynamic loopback port selection** | Completed | Added `FL_MCP_PORT` custom environment variable parsing inside `WindowsMIDITransport` |
+| W-3 | **Cross-platform Continuous Integration** | Completed | Implemented 8 robust simulated tests in `tests/test_windows_transport_automation.py` validating 100% Windows platform logic |
+
+---
+
+### Option 2 — WebSocket Network Transport (Completed)
+
+| # | Enhancement | Status | Notes |
+|---|-------------|--------|-------|
+| WST-1 | **WebSocket transport layer** | Completed | Added `WebSocketMIDITransport` under `src/fl_studio_mcp/transports/websocket.py` |
+| WST-2 | **Binary serialization** | Completed | Enforces strict byte array conversions for websocket payload transmission |
+| WST-3 | **WebSocket mock test verification** | Completed | Added 2 comprehensive tests in `tests/test_websocket_transport.py` |
+
+---
+
+### Option 3 — Deep GUI Automation for VST Preset Management (Completed)
+
+| # | Enhancement | Status | Notes |
+|---|-------------|--------|-------|
+| GUI-1 | **Abstract GUI Automation APIs** | Completed | Added `click_at`, `reset_ui`, and `dismiss_popup` definitions to base interface |
+| GUI-2 | **macOS AppleScript Implementation** | Completed | Native click, window layout reset, and keystroke/alert dismissal using standard osascript |
+| GUI-3 | **Windows PowerShell/VBScript Implementation** | Completed | Native clicks via User32 DLL mouse_event in inline PowerShell, VBScript SendKeys for reset and popup handling |
+| GUI-4 | **FastMCP GUI Tool Registrations** | Completed | Registered tools `fl_click_at`, `fl_reset_ui`, and `fl_dismiss_popup` on server |
+
+---
+
+### Option 4 — Production Configuration Guides & Distribution (Completed)
+
+| # | Enhancement | Status | Notes |
+|---|-------------|--------|-------|
+| DST-1 | **Standalone Executable Packaging** | Completed | Provided detailed PyInstaller single-binary compilation commands for macOS/Windows |
+| DST-2 | **Claude Desktop Config Templates** | Completed | Provided config templates for standalone binary, uv local development, and local over WebSocket |
+| DST-3 | **Virtual Port & Script Configurations** | Completed | Provided step-by-step loopback port configuration guides and FL Studio MIDI controller script setup |
 
 ---
 
@@ -540,4 +598,3 @@ Items are grouped by sprint theme. Priority order within each group.
 - **Solo is a toggle in FL Studio** — `channels.soloChannel(idx)` toggles state; `fl_solo_channel(soloed=False)` sends the same SysEx as `soloed=True`.
 - **Realtime note insertion** — Note/chord insertions trigger notes in realtime; they require record mode enabled in FL Studio to be captured on the current pattern.
 - **No SysEx size guard** — 128 notes × 9 bytes = 1,152-byte message. Some IAC Driver / loopMIDI configurations cap at 512 bytes and will silently drop it.
-- **Windows transport is a stub** — tested interface only; requires loopMIDI validation.

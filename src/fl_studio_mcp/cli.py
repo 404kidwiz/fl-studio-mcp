@@ -217,6 +217,80 @@ def save() -> None:
 
 
 @main.command()
+@click.option("--ack/--no-ack", default=False, help="Wait for confirmation (ACK) from FL Studio.")
+@click.option("--timeout", default=200, type=click.IntRange(50, 10000), help="Timeout for ACK in milliseconds.")
+def undo(ack: bool, timeout: int) -> None:
+    """Step backward in FL Studio's history stack (Undo)."""
+    bridge = get_connected_bridge()
+    from .protocol import encode_undo, CMD_UNDO
+    if ack:
+        res = run_async(bridge.send_write(encode_undo(), cmd_byte=CMD_UNDO, ack=True, timeout_ms=timeout))
+    else:
+        res = bridge.send_raw(encode_undo())
+    click.echo(json.dumps(res, indent=2))
+
+
+@main.command()
+@click.option("--ack/--no-ack", default=False, help="Wait for confirmation (ACK) from FL Studio.")
+@click.option("--timeout", default=200, type=click.IntRange(50, 10000), help="Timeout for ACK in milliseconds.")
+def redo(ack: bool, timeout: int) -> None:
+    """Step forward in FL Studio's history stack (Redo)."""
+    bridge = get_connected_bridge()
+    from .protocol import encode_redo, CMD_REDO
+    if ack:
+        res = run_async(bridge.send_write(encode_redo(), cmd_byte=CMD_REDO, ack=True, timeout_ms=timeout))
+    else:
+        res = bridge.send_raw(encode_redo())
+    click.echo(json.dumps(res, indent=2))
+
+
+@main.command()
+@click.option("--challenge", "-c", default=42, type=click.IntRange(0, 127), help="Ping challenge byte (0-127).")
+@click.option("--timeout", "-t", default=1000, type=click.IntRange(100, 10000), help="Timeout in milliseconds.")
+def ping(challenge: int, timeout: int) -> None:
+    """Send a lightweight ping to FL Studio to verify connection."""
+    bridge = get_connected_bridge()
+    from .protocol import encode_ping, CMD_PING
+    import time
+    if bridge.dry_run:
+        res = {
+            "dry_run": True,
+            "success": True,
+            "challenge": challenge,
+            "response_time_ms": 0.0,
+        }
+        click.echo(json.dumps(res, indent=2))
+        return
+
+    try:
+        start_time = time.monotonic()
+        pong = run_async(bridge.query(encode_ping(challenge), expected_cmd=CMD_PING, timeout_ms=timeout))
+        if pong is None:
+            click.echo(json.dumps({
+                "error": "TIMEOUT",
+                "message": f"Ping challenge {challenge} timed out after {timeout}ms."
+            }, indent=2))
+            return
+        
+        payload = pong.get("payload", [])
+        if not payload or payload[0] != challenge:
+            click.echo(json.dumps({
+                "error": "PROTOCOL_ERROR",
+                "message": f"Ping challenge verification failed: expected {challenge}, got {payload}"
+            }, indent=2))
+            return
+        
+        elapsed = (time.monotonic() - start_time) * 1000.0
+        click.echo(json.dumps({
+            "success": True,
+            "challenge": challenge,
+            "response_time_ms": round(elapsed, 2),
+        }, indent=2))
+    except Exception as exc:
+        click.echo(json.dumps({"error": "ERROR", "message": str(exc)}, indent=2))
+
+
+@main.command()
 def panic() -> None:
     """Send all-notes-off/all-sound-off on all 16 MIDI channels."""
     bridge = get_connected_bridge()
@@ -778,6 +852,241 @@ def mixer_state(start: int, end: int, timeout: int) -> None:
     click.echo(json.dumps(state_info, indent=2))
 
 
+# --- Composition commands ---
+
+@click.group()
+def composition() -> None:
+    """Music theory and composition helper commands."""
+    pass
+
+
+@composition.command(name="scale")
+@click.option("--root", "-r", default="C5", help="Root note (e.g. C5, F#4, Bb3)")
+@click.option("--scale", "-s", default="major", help="Scale type (e.g. major, minor, harmonic_minor)")
+@click.option("--octaves", "-o", default=1, type=click.IntRange(1, 8), help="Number of octaves (1-8).")
+@click.option("--rhythm", "-ry", default="eighth", help="Rhythm size (e.g. quarter, eighth, sixteenth).")
+@click.option("--channel", "-c", default=0, type=click.IntRange(0, 127), help="Target channel index.")
+@click.option("--start", "-t", default=0, type=click.IntRange(0, 1000000), help="Start tick offset.")
+@click.option("--curve", default="none", help="Velocity curve (none, humanize, crescendo, decrescendo).")
+@click.option("--swing", default=0.0, type=click.FloatRange(0.0, 1.0), help="Swing factor (0.0 - 1.0).")
+@click.option("--ack/--no-ack", default=False, help="Wait for confirmation from FL Studio.")
+@click.option("--timeout", default=2000, type=click.IntRange(100, 10000), help="Timeout for ACK in milliseconds.")
+def composition_scale(root: str, scale: str, octaves: int, rhythm: str, channel: int, start: int, curve: str, swing: float, ack: bool, timeout: int) -> None:
+    """Generate and insert a sequence of scale notes."""
+    get_connected_bridge()
+    from .tools.composition import register
+    from mcp.server.fastmcp import FastMCP
+    from .models import InsertScaleInput
+    
+    _mcp = FastMCP("test")
+    register(_mcp)
+    fn = {t.name: t for t in _mcp._tool_manager.list_tools()}["fl_insert_scale"].fn
+    
+    params = InsertScaleInput(
+        root=root,
+        scale=scale,
+        octaves=octaves,
+        rhythm=rhythm,
+        channel_index=channel,
+        start_tick=start,
+        velocity_curve=curve,
+        swing=swing,
+        ack=ack,
+        timeout_ms=timeout,
+    )
+    res_str = run_async(fn(params))
+    click.echo(res_str)
+
+
+@composition.command(name="arpeggio")
+@click.option("--root", "-r", default="C5", help="Root note (e.g. C5) or comma-separated list (e.g. C5,E5,G5).")
+@click.option("--chord", "-ch", default="major", help="Chord type formula to use if root is a single note.")
+@click.option("--style", "-st", default="up", help="Arpeggio style: up, down, updown, random.")
+@click.option("--rate", "-ra", default="sixteenth", help="Step rate rhythm: sixteenth, eighth, quarter.")
+@click.option("--octaves", "-o", default=1, type=click.IntRange(1, 8), help="Number of octaves (1-8).")
+@click.option("--channel", "-c", default=0, type=click.IntRange(0, 127), help="Target channel index.")
+@click.option("--start", "-t", default=0, type=click.IntRange(0, 1000000), help="Start tick offset.")
+@click.option("--beats", "-b", default=4.0, type=click.FloatRange(0.25, 100.0), help="Total duration in beats.")
+@click.option("--curve", default="none", help="Velocity curve (none, humanize, crescendo, decrescendo).")
+@click.option("--swing", default=0.0, type=click.FloatRange(0.0, 1.0), help="Swing factor (0.0 - 1.0).")
+@click.option("--ack/--no-ack", default=False, help="Wait for confirmation from FL Studio.")
+@click.option("--timeout", default=2000, type=click.IntRange(100, 10000), help="Timeout for ACK in milliseconds.")
+def composition_arpeggio(root: str, chord: str, style: str, rate: str, octaves: int, channel: int, start: int, beats: float, curve: str, swing: float, ack: bool, timeout: int) -> None:
+    """Generate and insert an arpeggio sequence."""
+    get_connected_bridge()
+    from .tools.composition import register
+    from mcp.server.fastmcp import FastMCP
+    from .models import InsertArpeggioInput
+    
+    _mcp = FastMCP("test")
+    register(_mcp)
+    fn = {t.name: t for t in _mcp._tool_manager.list_tools()}["fl_insert_arpeggio"].fn
+    
+    params = InsertArpeggioInput(
+        root=root,
+        chord_type=chord,
+        style=style,
+        rate=rate,
+        octaves=octaves,
+        channel_index=channel,
+        start_tick=start,
+        duration_beats=beats,
+        velocity_curve=curve,
+        swing=swing,
+        ack=ack,
+        timeout_ms=timeout,
+    )
+    res_str = run_async(fn(params))
+    click.echo(res_str)
+
+
+@composition.command(name="drums")
+@click.option("--mapping", "-m", required=True, help="JSON dict mapping channel indices to hits/rests sequence, e.g. '{\\\"0\\\": [1,0,0,1]}'.")
+@click.option("--rhythm", "-ry", default="sixteenth", help="Rhythm size (sixteenth, eighth, quarter).")
+@click.option("--start", "-t", default=0, type=click.IntRange(0, 1000000), help="Start tick offset.")
+@click.option("--curve", default="none", help="Velocity curve (none, humanize, crescendo, decrescendo).")
+@click.option("--swing", default=0.0, type=click.FloatRange(0.0, 1.0), help="Swing factor (0.0 - 1.0).")
+@click.option("--ack/--no-ack", default=False, help="Wait for confirmation from FL Studio.")
+@click.option("--timeout", default=2000, type=click.IntRange(100, 10000), help="Timeout for ACK in milliseconds.")
+def composition_drums(mapping: str, rhythm: str, start: int, curve: str, swing: float, ack: bool, timeout: int) -> None:
+    """Insert a step-sequencer style drum pattern across channels."""
+    get_connected_bridge()
+    from .tools.composition import register
+    from mcp.server.fastmcp import FastMCP
+    from .models import InsertDrumPatternInput
+    
+    _mcp = FastMCP("test")
+    register(_mcp)
+    fn = {t.name: t for t in _mcp._tool_manager.list_tools()}["fl_insert_drum_pattern"].fn
+    
+    params = InsertDrumPatternInput(
+        mapping=mapping,
+        rhythm=rhythm,
+        start_tick=start,
+        velocity_curve=curve,
+        swing=swing,
+        ack=ack,
+        timeout_ms=timeout,
+    )
+    res_str = run_async(fn(params))
+    click.echo(res_str)
+
+
+@main.command(name="link-script")
+@click.option("--dest", "-d", help="Explicit target directory path for the FL Studio Hardware Settings folder.")
+def link_script(dest: str | None) -> None:
+    """Automatically copy/link the MIDI controller script to FL Studio's Hardware settings folder."""
+    import shutil
+    import sys
+    
+    script_source_dir = Path(__file__).resolve().parent.parent.parent / "fl_studio_scripts" / "fl_mcp_bridge"
+    if not script_source_dir.exists():
+        raise click.ClickException(f"Source script directory not found at {script_source_dir}")
+        
+    if dest:
+        hardware_dir = Path(dest)
+    else:
+        # Determine standard directories
+        home = Path.expanduser(Path("~"))
+        if sys.platform == "win32":
+            docs = home / "Documents"
+            onedrive_docs = home / "OneDrive" / "Documents"
+            
+            candidates = [
+                docs / "Image-Line" / "FL Studio" / "Settings" / "Hardware",
+                onedrive_docs / "Image-Line" / "FL Studio" / "Settings" / "Hardware",
+            ]
+        else:
+            candidates = [
+                home / "Documents" / "Image-Line" / "FL Studio" / "Settings" / "Hardware",
+            ]
+            
+        hardware_dir = None
+        for candidate in candidates:
+            if candidate.exists():
+                hardware_dir = candidate
+                break
+                
+        if not hardware_dir:
+            hardware_dir = candidates[0]
+            
+    target_dir = hardware_dir / "FL Studio MCP Bridge"
+    
+    try:
+        hardware_dir.mkdir(parents=True, exist_ok=True)
+        if target_dir.exists():
+            shutil.rmtree(target_dir)
+        shutil.copytree(script_source_dir, target_dir)
+        
+        click.echo(json.dumps({
+            "status": "success",
+            "source": str(script_source_dir),
+            "destination": str(target_dir),
+            "message": f"Successfully installed FL Studio MCP Bridge MIDI script to: {target_dir}"
+        }, indent=2))
+    except Exception as e:
+        raise click.ClickException(f"Failed to copy script to {target_dir}: {e}")
+
+
+@main.command(name="install-config")
+@click.option("--claude-config", "-c", help="Explicit path to the claude_desktop_config.json file.")
+def install_config(claude_config: str | None) -> None:
+    """Register the FL Studio MCP server in the Claude Desktop configuration file."""
+    import sys
+    import os
+    
+    workspace_dir = Path(__file__).resolve().parent.parent.parent
+    
+    if claude_config:
+        config_file = Path(claude_config)
+    else:
+        home = Path.expanduser(Path("~"))
+        if sys.platform == "win32":
+            appdata = os.environ.get("APPDATA")
+            if appdata:
+                config_file = Path(appdata) / "Claude" / "claude_desktop_config.json"
+            else:
+                config_file = home / "AppData" / "Roaming" / "Claude" / "claude_desktop_config.json"
+        else:
+            config_file = home / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+            
+    try:
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        config_data = {}
+        if config_file.exists():
+            try:
+                with open(config_file, "r") as f:
+                    config_data = json.load(f)
+            except Exception:
+                config_data = {}
+                
+        if "mcpServers" not in config_data:
+            config_data["mcpServers"] = {}
+            
+        config_data["mcpServers"]["fl-studio-mcp"] = {
+            "command": "uv",
+            "args": [
+                "--directory",
+                str(workspace_dir),
+                "run",
+                "fl-studio",
+                "serve"
+            ]
+        }
+        
+        with open(config_file, "w") as f:
+            json.dump(config_data, f, indent=2)
+            
+        click.echo(json.dumps({
+            "status": "success",
+            "config_path": str(config_file),
+            "workspace": str(workspace_dir),
+            "message": f"Successfully registered fl-studio-mcp in: {config_file}"
+        }, indent=2))
+    except Exception as e:
+        raise click.ClickException(f"Failed to write Claude Desktop configuration: {e}")
+
+
 # Add sub-groups
 main.add_command(channels)
 main.add_command(patterns)
@@ -785,6 +1094,8 @@ main.add_command(notes)
 main.add_command(plugins)
 main.add_command(library)
 main.add_command(mixer)
+main.add_command(composition)
 
 if __name__ == "__main__":
     main()
+

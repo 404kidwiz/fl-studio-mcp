@@ -70,9 +70,25 @@ def register(mcp: FastMCP) -> None:
         bridge = FLStudioBridge.get()
         note_dicts = _notes_to_dicts(params.notes)
 
+        # Apply composition modifiers (velocity curves and swing)
+        from ..theory import apply_composition_modifiers
+        note_dicts = apply_composition_modifiers(
+            note_dicts, params.velocity_curve, params.swing
+        )
+
+        # Chunk notes list into batches of max 32 notes
+        max_chunk_size = 32
+        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+
+        from ..protocol import CMD_NOTES
+
+        last_result = None
         try:
-            sysex = encode_notes(note_dicts)
-            result = bridge.send_raw(sysex)
+            for chunk in note_chunks:
+                sysex = encode_notes(chunk)
+                last_result = await bridge.send_write(
+                    sysex, CMD_NOTES, params.ack, params.timeout_ms
+                )
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
@@ -81,8 +97,10 @@ def register(mcp: FastMCP) -> None:
                 FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
             )
 
+        result = last_result or {}
         result["note_count"] = len(params.notes)
         result["notes_preview"] = note_dicts[:8]
+        result["chunks_sent"] = len(note_chunks)
         return format_result(result)
 
     @mcp.tool(
@@ -127,6 +145,7 @@ def register(mcp: FastMCP) -> None:
                 - total_notes (int): individual MIDI notes sent
                 - progression_preview (list): summary of each chord
                 - bytes (str): hex of SysEx sent
+                - chunks_sent (int): number of SysEx chunks sent
 
         Examples:
             I-V-vi-IV in C major (C4=60):
@@ -171,9 +190,18 @@ def register(mcp: FastMCP) -> None:
             )
 
         note_dicts = _notes_to_dicts(all_notes)
+        max_chunk_size = 32
+        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+
+        from ..protocol import CMD_NOTES
+
+        last_result = None
         try:
-            sysex = encode_notes(note_dicts)
-            result = bridge.send_raw(sysex)
+            for chunk in note_chunks:
+                sysex = encode_notes(chunk)
+                last_result = await bridge.send_write(
+                    sysex, CMD_NOTES, params.ack, params.timeout_ms
+                )
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
@@ -182,7 +210,10 @@ def register(mcp: FastMCP) -> None:
                 FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
             )
 
+        result = last_result or {}
         result["chord_count"] = len(params.chords)
         result["total_notes"] = len(all_notes)
         result["progression_preview"] = progression_preview
+        result["chunks_sent"] = len(note_chunks)
         return format_result(result)
+

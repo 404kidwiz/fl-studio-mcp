@@ -116,6 +116,9 @@ class FLStudioBridge:
             self._input_port_name = "(dry-run)"
             return self._output_port_name
 
+        if port_name_hint.startswith("ws://") or port_name_hint.startswith("wss://"):
+            self._transport = get_transport(port_name_hint)
+
         # --- Output port ---
         outputs = self._transport.list_output_ports()
         exact_out = self._transport.resolve_port(port_name_hint, outputs)
@@ -183,6 +186,7 @@ class FLStudioBridge:
         self._input_port_name = ""
         self._dry_run = False
         self._query_lock = None  # reset lock so a new event loop gets a fresh one
+        self._transport = get_transport()
 
     def _close_output(self) -> None:
         if self._output_port is not None:
@@ -230,8 +234,82 @@ class FLStudioBridge:
             }
 
         msg = mido.Message.from_bytes(raw_bytes)
-        self._output_port.send(msg)
+        try:
+            self._output_port.send(msg)
+        except (mido.PortsError, OSError, AttributeError) as exc:
+            self.disconnect()
+            raise FLMCPError(
+                ErrorCode.CONNECTION_ERROR,
+                f"MIDI connection is stale or disconnected: {exc}",
+                {"original_error": str(exc)},
+            ) from exc
         return {"sent": True, "bytes": hex_str}
+
+    async def send_raw_with_ack(
+        self,
+        raw_bytes: bytes,
+        cmd_byte: int,
+        timeout_ms: int = 200,
+    ) -> dict[str, Any]:
+        """Send raw bytes and wait for RESP_ACK from FL Studio for this command."""
+        self._require_connection()
+        hex_str = raw_bytes.hex(" ").upper()
+
+        if self._dry_run:
+            return {
+                "dry_run": True,
+                "would_send_bytes": hex_str,
+                "byte_count": len(raw_bytes),
+                "ack_received": True,
+            }
+
+        if not self.listening:
+            # If no input port is active, we cannot listen for ACK, so we degrade gracefully
+            self.send_raw(raw_bytes)
+            return {"sent": True, "bytes": hex_str, "ack_received": False, "reason": "No input listener"}
+
+        from .protocol import RESP_ACK, decode_resp_ack
+
+        async with self._get_query_lock():
+            self._drain_queue()
+            self.send_raw(raw_bytes)
+
+            deadline = time.monotonic() + timeout_ms / 1000.0
+            while time.monotonic() < deadline:
+                try:
+                    item = self._response_queue.get_nowait()
+                    if item["cmd"] == RESP_ACK:
+                        acked_cmd = decode_resp_ack(item["payload"])
+                        if acked_cmd == cmd_byte:
+                            return {"sent": True, "bytes": hex_str, "ack_received": True}
+                    # Put it back if it's not ours
+                    try:
+                        self._response_queue.put_nowait(item)
+                    except thread_queue.Full:
+                        pass
+                except thread_queue.Empty:
+                    pass
+                await asyncio.sleep(_POLL_INTERVAL)
+
+        raise FLMCPError(
+            ErrorCode.TIMEOUT,
+            f"Command {cmd_byte:#x} write verification (ACK) timed out after {timeout_ms}ms.",
+            {"cmd": cmd_byte, "timeout_ms": timeout_ms}
+        )
+
+    async def send_write(
+        self,
+        raw_bytes: bytes,
+        cmd_byte: int,
+        ack: bool = False,
+        timeout_ms: int = 200,
+    ) -> dict[str, Any]:
+        """Send a write command SysEx, optionally waiting for RESP_ACK from FL Studio."""
+        if ack:
+            return await self.send_raw_with_ack(raw_bytes, cmd_byte, timeout_ms)
+        else:
+            return self.send_raw(raw_bytes)
+
 
     # ------------------------------------------------------------------
     # Bidirectional query

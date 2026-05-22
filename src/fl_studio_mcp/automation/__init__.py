@@ -11,6 +11,12 @@ class FallbackAutomation(GUIAutomation):
         return False
     def open_file(self, filepath: str) -> bool:
         return False
+    def click_at(self, x: int, y: int, delay_ms: int = 100) -> bool:
+        return False
+    def reset_ui(self, layout: str = "default") -> bool:
+        return False
+    def dismiss_popup(self, action: str = "confirm") -> bool:
+        return False
 
 def get_automation() -> GUIAutomation:
     """Get the platform-specific GUIAutomation implementation.

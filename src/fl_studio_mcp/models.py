@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Optional, List
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -196,26 +196,137 @@ class ConnectInput(BaseModel):
     )
 
 
-class PlayStopInput(BaseModel):
+class WriteCommandInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    ack: bool = Field(default=False, description="Whether to wait for confirmation (ACK) from FL Studio.")
+    timeout_ms: Annotated[int, Field(ge=50, le=10000)] = Field(
+        default=200,
+        description="How long to wait for ACK (if enabled), in milliseconds.",
+    )
 
+
+class PlayStopInput(WriteCommandInput):
     # No parameters — transport commands are stateless
     pass
 
 
-class SetTempoInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SetTempoInput(WriteCommandInput):
     bpm: Annotated[int, Field(ge=20, le=999, description="Target BPM (20-999)")]
 
 
-class InsertNotesInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class InsertNotesInput(WriteCommandInput):
     notes: list[Note] = Field(
         min_length=1,
         max_length=128,
         description="List of notes to insert. Max 128 notes per call.",
+    )
+    velocity_curve: str = Field(
+        default="none",
+        description="Velocity curve: 'none', 'humanize' (±15 random), 'crescendo', 'decrescendo'",
+    )
+    swing: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
+        default=0.0,
+        description="Swing percentage (0.0 - 1.0) to shift even-numbered subdivisions.",
+    )
+
+
+class InsertScaleInput(WriteCommandInput):
+    root: str = Field(
+        default="C5",
+        description="Root note (e.g. C5, F#4, Bb3)",
+    )
+    scale: str = Field(
+        default="major",
+        description="Scale type: 'major', 'minor', 'pentatonic_major', 'pentatonic_minor', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'locrian', 'harmonic_minor', 'melodic_minor', 'chromatic', 'whole_tone'",
+    )
+    octaves: Annotated[int, Field(ge=1, le=8)] = Field(
+        default=1,
+        description="Number of octaves to span (1 to 8).",
+    )
+    rhythm: str = Field(
+        default="eighth",
+        description="Rhythm step size: 'whole', 'half', 'quarter', 'eighth', 'sixteenth', 'triplet_quarter', 'triplet_eighth' or a tick count.",
+    )
+    channel_index: Annotated[int, Field(ge=0, le=127)] = Field(
+        default=0,
+        description="Target channel index in the Channel Rack.",
+    )
+    start_tick: Annotated[int, Field(ge=0)] = Field(
+        default=0,
+        description="Tick at which the scale starts (96 ticks = 1 beat).",
+    )
+    velocity_curve: str = Field(
+        default="none",
+        description="Velocity curve: 'none', 'humanize', 'crescendo', 'decrescendo'",
+    )
+    swing: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
+        default=0.0,
+        description="Swing percentage (0.0 - 1.0) to shift even steps.",
+    )
+
+
+class InsertArpeggioInput(WriteCommandInput):
+    root: str = Field(
+        default="C5",
+        description="Root note or starting note (e.g. C5, F#4) or comma-separated list of notes (e.g. 'C5,E5,G5')",
+    )
+    chord_type: str = Field(
+        default="major",
+        description="Chord formula to use if root is a single note: 'major', 'minor', 'diminished', 'augmented', 'major7', 'minor7', 'dominant7', 'sus2', 'sus4'",
+    )
+    style: str = Field(
+        default="up",
+        description="Arpeggio pattern style: 'up', 'down', 'updown' (pingpong), 'random'",
+    )
+    rate: str = Field(
+        default="sixteenth",
+        description="Step duration rate: 'whole', 'half', 'quarter', 'eighth', 'sixteenth', 'triplet_quarter', 'triplet_eighth' or a tick count.",
+    )
+    octaves: Annotated[int, Field(ge=1, le=8)] = Field(
+        default=1,
+        description="Number of octaves to repeat the arpeggiation (1 to 8).",
+    )
+    channel_index: Annotated[int, Field(ge=0, le=127)] = Field(
+        default=0,
+        description="Target channel index in the Channel Rack.",
+    )
+    start_tick: Annotated[int, Field(ge=0)] = Field(
+        default=0,
+        description="Tick at which the arpeggio starts.",
+    )
+    duration_beats: Annotated[float, Field(ge=0.25)] = Field(
+        default=4.0,
+        description="Total duration of arpeggiation in beats (BPM dependent).",
+    )
+    velocity_curve: str = Field(
+        default="none",
+        description="Velocity curve: 'none', 'humanize', 'crescendo', 'decrescendo'",
+    )
+    swing: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
+        default=0.0,
+        description="Swing percentage (0.0 - 1.0) to shift even steps.",
+    )
+
+
+class InsertDrumPatternInput(WriteCommandInput):
+    mapping: str = Field(
+        description="JSON dictionary mapping channel index strings to lists of 1s (hits) and 0s (rests) e.g., '{\"0\": [1,0,0,1], \"1\": [0,1,0,0]}'",
+    )
+    rhythm: str = Field(
+        default="sixteenth",
+        description="Step duration rate: 'whole', 'half', 'quarter', 'eighth', 'sixteenth', 'triplet_quarter', 'triplet_eighth' or a tick count.",
+    )
+    start_tick: Annotated[int, Field(ge=0)] = Field(
+        default=0,
+        description="Tick at which the drum pattern starts.",
+    )
+    velocity_curve: str = Field(
+        default="none",
+        description="Velocity curve: 'none', 'humanize', 'crescendo', 'decrescendo'",
+    )
+    swing: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
+        default=0.0,
+        description="Swing percentage (0.0 - 1.0) to shift even steps.",
     )
 
 
@@ -242,9 +353,7 @@ class ChordStep(BaseModel):
         return int(v)
 
 
-class AddChordProgressionInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AddChordProgressionInput(WriteCommandInput):
     chords: list[ChordStep] = Field(
         min_length=1,
         max_length=32,
@@ -252,7 +361,7 @@ class AddChordProgressionInput(BaseModel):
     )
 
 
-class SaveProjectInput(BaseModel):
+class SaveProjectInput(WriteCommandInput):
     """Input for saving the current project.
 
     FL Studio's ui.save() saves to the current filename (Ctrl+S equivalent).
@@ -260,12 +369,32 @@ class SaveProjectInput(BaseModel):
     No filename can be set programmatically from a controller script.
     """
 
-    model_config = ConfigDict(extra="forbid")
-
 
 # ---------------------------------------------------------------------------
 # New tool input models
 # ---------------------------------------------------------------------------
+
+class UndoInput(WriteCommandInput):
+    """Input for navigating backward in history (Undo)."""
+    pass
+
+
+class RedoInput(WriteCommandInput):
+    """Input for navigating forward in history (Redo)."""
+    pass
+
+
+class PingInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    challenge: Annotated[int, Field(ge=0, le=127)] = Field(
+        default=42,
+        description="Ping challenge byte (0-127).",
+    )
+    timeout_ms: Annotated[int, Field(ge=100, le=10000)] = Field(
+        default=1000,
+        description="How long to wait for response, in milliseconds.",
+    )
+
 
 class GetStatusInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -285,23 +414,17 @@ class ListChannelsInput(BaseModel):
     )
 
 
-class SetChannelVolumeInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SetChannelVolumeInput(WriteCommandInput):
     channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")] = 0
     volume: Annotated[int, Field(ge=0, le=127, description="Volume level 0-127 (100 = unity gain)")] = 100
 
 
-class CreatePatternInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class CreatePatternInput(WriteCommandInput):
     # No required params — FL Studio creates the next available pattern
     pass
 
 
-class SelectPatternInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SelectPatternInput(WriteCommandInput):
     pattern_index: Annotated[int, Field(ge=0, le=127, description="Pattern index to jump to (0-based)")]
 
 
@@ -314,16 +437,12 @@ class ListPatternsInput(BaseModel):
     )
 
 
-class MuteChannelInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class MuteChannelInput(WriteCommandInput):
     channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
     muted: bool = Field(default=True, description="True to mute, False to unmute.")
 
 
-class SoloChannelInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SoloChannelInput(WriteCommandInput):
     channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
     soloed: bool = Field(default=True, description="True to solo, False to un-solo.")
 
@@ -341,9 +460,7 @@ class DisconnectInput(BaseModel):
 
 
 
-class SetChannelPanInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SetChannelPanInput(WriteCommandInput):
     channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
     pan: Annotated[int, Field(ge=0, le=127, description="Pan position: 0=full left, 64=centre, 127=full right")] = 64
 
@@ -366,16 +483,12 @@ class GetContextInput(BaseModel):
     )
 
 
-class SetPatternLengthInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SetPatternLengthInput(WriteCommandInput):
     pattern_index: Annotated[int, Field(ge=0, le=999, description="Pattern index (0-based, up to 999)")]
     length_beats: Annotated[int, Field(ge=1, le=999, description="Target pattern length in beats (1-999)")]
 
 
-class RenameChannelInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class RenameChannelInput(WriteCommandInput):
     channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
     name: Annotated[str, Field(min_length=1, max_length=14, description="New name (ASCII characters only, max 14 chars)")]
 
@@ -387,9 +500,7 @@ class RenameChannelInput(BaseModel):
         return v
 
 
-class RenamePatternInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class RenamePatternInput(WriteCommandInput):
     pattern_index: Annotated[int, Field(ge=0, le=999, description="Pattern index (0-based, up to 999)")]
     name: Annotated[str, Field(min_length=1, max_length=14, description="New name (ASCII characters only, max 14 chars)")]
 
@@ -401,23 +512,17 @@ class RenamePatternInput(BaseModel):
         return v
 
 
-class SetMixerVolumeInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SetMixerVolumeInput(WriteCommandInput):
     track_index: Annotated[int, Field(ge=0, le=127, description="Mixer track index (0-127)")] = 0
     volume: Annotated[int, Field(ge=0, le=127, description="Volume level 0-127 (100 = unity gain / 100% fader in FL)")] = 100
 
 
-class SetMixerPanInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class SetMixerPanInput(WriteCommandInput):
     track_index: Annotated[int, Field(ge=0, le=127, description="Mixer track index (0-127)")]
     pan: Annotated[int, Field(ge=0, le=127, description="Pan position: 0=full left, 64=centre, 127=full right")] = 64
 
 
-class RouteToMixerInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class RouteToMixerInput(WriteCommandInput):
     channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
     track_index: Annotated[int, Field(ge=0, le=127, description="Mixer track index (0-127) to route to")]
 
@@ -428,4 +533,67 @@ class GetMixerStateInput(BaseModel):
     start_track: Annotated[int, Field(ge=0, le=127, description="Start track index (0-127)")] = 0
     end_track: Annotated[int, Field(ge=0, le=127, description="End track index (0-127)")] = 16
     timeout_ms: Annotated[int, Field(ge=100, le=10000, description="How long to wait for response in milliseconds")] = 2000
+
+
+# --- Option 2: Preset Librarian Pydantic Inputs ---
+
+class CatalogPresetInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    vst_name: Annotated[str, Field(min_length=1, max_length=100, description="The name of the VST plug-in (e.g. Serum, Vital)")]
+    preset_name: Annotated[str, Field(min_length=1, max_length=100, description="The name of the VST preset to catalog")]
+    x: Annotated[int, Field(ge=0, description="X screen coordinate for mouse click")]
+    y: Annotated[int, Field(ge=0, description="Y screen coordinate for mouse click")]
+    category: Annotated[str, Field(default="Unsorted", description="Optional preset category (e.g. Leads, Pads, Basses)")]
+    tags: Annotated[Optional[List[str]], Field(default=None, description="Optional search tags for categorization")] = None
+    notes: Annotated[str, Field(default="", description="Descriptive notes or documentation about the preset")] = ""
+
+
+class SearchPresetsInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: Annotated[Optional[str], Field(default=None, description="Keyword search query across name, notes, category, and tags")] = None
+    vst_name: Annotated[Optional[str], Field(default=None, description="Filter presets by specific VST name")] = None
+    tag: Annotated[Optional[str], Field(default=None, description="Filter presets by a single tag")] = None
+    category: Annotated[Optional[str], Field(default=None, description="Filter presets by a specific category")] = None
+
+
+class LoadPresetInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    vst_name: Annotated[str, Field(min_length=1, description="The name of the VST plug-in")]
+    preset_name: Annotated[str, Field(min_length=1, description="The name of the preset to load")]
+
+
+# --- Option 3: Algorithmic Composition Pydantic Inputs ---
+
+class InsertEuclideanDrumsInput(WriteCommandInput):
+    mapping: Annotated[str, Field(description="JSON dict string mapping channel index strings to binary sequencer hit length, e.g. '{\"0\": [1,0,0,1]}'")]
+    rhythm: Annotated[str, Field(default="sixteenth", description="The step subdivision speed, e.g. 'sixteenth', 'eighth', 'quarter'")] = "sixteenth"
+    start_tick: Annotated[int, Field(default=0, ge=0, description="Starting tick offset (96 PPQ)")] = 0
+    hits: Annotated[int, Field(default=5, ge=1, le=64, description="Number of hits to distribute")] = 5
+    steps: Annotated[int, Field(default=16, ge=1, le=128, description="Length of sequence loop steps")] = 16
+    rotation: Annotated[int, Field(default=0, description="Left/right circular shift (rotation) of Euclidean rhythm")] = 0
+    velocity_curve: Annotated[str, Field(default="none", description="Velocity curves: 'none', 'humanize', 'crescendo', 'decrescendo'")] = "none"
+    swing: Annotated[float, Field(default=0.0, ge=0.0, le=1.0, description="Swing quantization shift factor")] = 0.0
+
+
+class GenerateMarkovMelodyInput(WriteCommandInput):
+    root: Annotated[str, Field(default="C5", description="Root note name (e.g. C5, F#4)")] = "C5"
+    scale: Annotated[str, Field(default="minor", description="Scale type (e.g. major, minor, dorian, harmonic_minor)")] = "minor"
+    length_beats: Annotated[float, Field(default=4.0, ge=0.5, le=32.0, description="Length of melody in beats")] = 4.0
+    rate: Annotated[str, Field(default="eighth", description="Step note division speed: 'sixteenth', 'eighth', 'quarter'")] = "eighth"
+    channel_index: Annotated[int, Field(default=0, ge=0, le=127, description="Target instrument channel index")] = 0
+    start_tick: Annotated[int, Field(default=0, ge=0, description="Start tick offset (96 PPQ)")] = 0
+    velocity_curve: Annotated[str, Field(default="humanize", description="Velocity curves: 'none', 'humanize', 'crescendo', 'decrescendo'")] = "humanize"
+    swing: Annotated[float, Field(default=0.0, ge=0.0, le=1.0, description="Swing quantization shift factor")] = 0.0
+
+
+class InsertVoiceLedProgressionInput(WriteCommandInput):
+    progression: Annotated[str, Field(description="Comma-separated chord progression, e.g. 'C5-major, G5-major, A4-minor, F4-major'")]
+    rate: Annotated[str, Field(default="half", description="Chord change division: 'whole', 'half', 'quarter'")] = "half"
+    channel_index: Annotated[int, Field(default=0, ge=0, le=127, description="Target instrument channel index")] = 0
+    start_tick: Annotated[int, Field(default=0, ge=0, description="Start tick offset (96 PPQ)")] = 0
+    velocity_curve: Annotated[str, Field(default="none", description="Velocity curves: 'none', 'humanize', 'crescendo', 'decrescendo'")] = "none"
+    swing: Annotated[float, Field(default=0.0, ge=0.0, le=1.0, description="Swing quantization shift factor")] = 0.0
 

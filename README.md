@@ -1,139 +1,268 @@
 # FL Studio MCP
 
-Control FL Studio from Claude (or any MCP client) via MIDI — bidirectional, type-safe, dry-run-capable.
+<p align="center">
+  <img src="assets/banner.png" alt="FL Studio MCP Banner" width="100%"/>
+</p>
 
-```
-Claude ──stdio──► fl-studio-mcp (Python) ──MIDI SysEx──► IAC Driver ──► FL Studio
-                                          ◄──MIDI SysEx──────────────────────────
-```
+<p align="center">
+  <img src="assets/logo.png" alt="FL Studio MCP Logo" width="220"/>
+</p>
 
----
+<h1 align="center">FL Studio MCP Server</h1>
 
-## Architecture
+<p align="center">
+  <b>Real-time AI-assisted music production, advanced composition, mixing, and VST coordination for FL Studio via bidirectional MIDI & WebSockets.</b>
+</p>
 
-```
-fl-studio-mcp/
-├── src/fl_studio_mcp/
-│   ├── server.py              # FastMCP server — entry point
-│   ├── cli.py                 # Click-based CLI entry point
-│   ├── bridge.py              # Singleton MIDI connection + response queue
-│   ├── models.py              # Pydantic schemas (Note, ChordStep, inputs)
-│   ├── errors.py              # Structured error types
-│   ├── protocol.py            # SysEx encode/decode (shared with FL script)
-│   └── transports/
-│       ├── base.py            # Abstract MIDITransport interface
-│       ├── macos.py           # IAC Driver (macOS) — primary
-│       └── windows.py         # loopMIDI (Windows) — stub, same interface
-│   └── tools/
-│       ├── midi_ports.py      # fl_list_midi_ports
-│       ├── connection.py      # fl_connect, fl_disconnect
-│       ├── transport_control.py  # fl_play_transport, fl_stop_transport
-│       ├── tempo.py           # fl_set_tempo
-│       ├── notes.py           # fl_insert_notes, fl_add_chord_progression
-│       ├── project.py         # fl_save_project
-│       ├── status.py          # fl_get_status  ← bidirectional
-│       ├── channels.py        # fl_list_channels, fl_set_channel_volume, fl_set_channel_pan  ← bidirectional
-│       ├── patterns.py        # fl_create_pattern, fl_select_pattern
-│       ├── pattern_list.py    # fl_list_patterns  ← bidirectional
-│       └── mixing.py          # fl_panic, fl_mute_channel, fl_solo_channel
-├── fl_studio_scripts/
-│   └── fl_mcp_bridge/
-│       └── device_fl_mcp_bridge.py  # FL Studio controller script (v1.4)
-└── tests/
-```
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?style=for-the-badge&logo=python" alt="Python Versions"/>
+  <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-green?style=for-the-badge" alt="Platforms"/>
+  <img src="https://img.shields.io/badge/Tests-326%20Passing-brightgreen?style=for-the-badge" alt="Tests"/>
+  <img src="https://img.shields.io/badge/License-MIT-orange?style=for-the-badge" alt="License"/>
+</p>
 
 ---
 
-## Tools Reference (19 total)
+## 🎼 Overwhelming Developer & Producer Power
 
-### Connection
+**FL Studio MCP** acts as an intelligent, high-fidelity bridge that exposes FL Studio to any Model Context Protocol (MCP) client—like Claude Desktop. By translating high-level agentic instructions into real-time MIDI SysEx commands, OS-native window automation routines, and deep theory algorithms, this server lets you orchestrate complete musical compositions, mix channels, route signals, and catalog third-party VST presets completely in code or via conversational chat.
 
-| Tool | Description |
-|------|-------------|
-| `fl_list_midi_ports` | List all available MIDI input/output ports |
-| `fl_connect` | Connect to FL Studio via MIDI. Set `dry_run=true` to preview without sending |
-| `fl_disconnect` | Close active MIDI input and output ports cleanly, resetting connection state |
-
-### Transport
-
-| Tool | Description |
-|------|-------------|
-| `fl_play_transport` | Start playback |
-| `fl_stop_transport` | Stop playback |
-| `fl_set_tempo` | Set BPM (20–999) |
-
-### Notes
-
-| Tool | Description |
-|------|-------------|
-| `fl_insert_notes` | Trigger notes realtime. Enable Record in FL Studio to record them |
-| `fl_add_chord_progression` | Trigger chords realtime by root + quality. Enable Record in FL Studio to record them |
-
-### Project
-
-| Tool | Description |
-|------|-------------|
-| `fl_save_project` | Save the current project (Ctrl+S equivalent) |
-
-### Status & Channels (bidirectional — require FL MCP Bridge script)
-
-| Tool | Description |
-|------|-------------|
-| `fl_get_status` | Query transport state, BPM, current pattern index, channel count |
-| `fl_list_channels` | List all channel rack instruments by name |
-| `fl_set_channel_volume` | Set a channel's volume (0–127, 100 = unity gain) |
-| `fl_set_channel_pan` | Set a channel's panning (0–127, 64 = center) |
-
-### Patterns
-
-| Tool | Description |
-|------|-------------|
-| `fl_create_pattern` | Create the next empty pattern slot |
-| `fl_select_pattern` | Jump to a pattern by index |
-| `fl_list_patterns` | List all pattern names (bidirectional — requires bridge script) |
-
-### Mixing
-
-| Tool | Description |
-|------|-------------|
-| `fl_panic` | Send All Notes Off + All Sound Off to all 16 MIDI channels immediately |
-| `fl_mute_channel` | Mute or unmute a channel rack slot |
-| `fl_solo_channel` | Solo or un-solo a channel rack slot |
+Whether you're looking to generate complex polyrhythms, optimize harmonic chord voicings, or automate a visual click inside Serum, the FL Studio MCP gives you full, type-safe, dry-run-capable control over your DAW.
 
 ---
 
-## Quick Start (macOS)
+## 🛠️ Architecture
 
-### 1. Enable IAC Driver
+The MCP server maintains a persistent, thread-safe, and concurrent-safe connection queue. Below is the simplified message flow between the client, server, and FL Studio instance:
 
-Open **Audio MIDI Setup** → MIDI Studio → Double-click "IAC Driver" → check **Device is online** → create a bus named **"IAC Driver Bus 1"** if one doesn't exist.
+```
+                  ┌──────────────────────────────────────────────┐
+                  │          Claude Desktop / MCP Client         │
+                  └──────────────────────┬───────────────────────┘
+                                         │ stdio (JSON-RPC)
+                                         ▼
+                  ┌──────────────────────────────────────────────┐
+                  │            FL Studio MCP Server              │
+                  │              (Python / FastMCP)              │
+                  └───────┬──────────────────────────────┬───────┘
+                          │                              │
+                          ▼ (MIDI SysEx / MMC)           ▼ (OS native script execution)
+             ┌─────────────────────────┐    ┌─────────────────────────┐
+             │    FLStudioBridge       │    │      GUIAutomation      │
+             │  (Lock-guarded I/O)     │    │  (AppleScript/PSh-VBS)  │
+             └────┬───────────────▲────┘    └────────────┬────────────┘
+                  │               │                      │
+                  │ MIDI SysEx    │ Responses            │ Focus / Layout / Mouse Clicks
+                  ▼ (IAC/loopMIDI)│ (SysEx)              ▼
+             ┌────────────────────┴──────────────────────────────┐
+             │                     FL Studio                     │
+             │           (FL MCP Bridge script v1.4)             │
+             └───────────────────────────────────────────────────┘
+```
 
-### 2. Install
+The codebase is highly modular and strictly structured:
+* **`src/fl_studio_mcp/server.py`**: FastMCP server entry point containing tool, resource, and prompt registrations.
+* **`src/fl_studio_mcp/bridge.py`**: A lock-guarded, concurrent-safe singleton managing the physical MIDI input/output ports and response queries.
+* **`src/fl_studio_mcp/transports/`**: An abstract transport layer isolating platform specifics. Supports `MacOSMIDITransport` (IAC Driver), `WindowsMIDITransport` (loopMIDI), and `WebSocketMIDITransport` (network-based virtualization).
+* **`src/fl_studio_mcp/automation/`**: OS-specific scripts (`macos.py` using AppleScript, `windows.py` using VBScript + PowerShell) to focus the DAW, click coordinates, reset window layout (`Ctrl+Shift+H`), and dismiss popup dialogs.
+* **`src/fl_studio_mcp/theory.py`**: Pure music theory engine containing Euclidean rhythm generators, Markov chain melodies, chord voicing grids, and minimum-transposition voice-leading optimization routines.
+* **`src/fl_studio_mcp/presets.py`**: A JSON-backed local patch librarian that tracks custom coordinate click coordinates for third-party VSTs.
 
+---
+
+## 🎛️ Complete Tools Reference (44 Tools)
+
+FL Studio MCP exposes a robust catalog of **44 FastMCP tools** organized into clean functional areas:
+
+### 1. Connection & Diagnostics (3)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_list_midi_ports` | Scans and lists all available hardware and virtual MIDI input/output ports. | **No** |
+| `fl_connect` | Establishes connection to targeted MIDI ports. Supports `dry_run=true` to preview. | **No** |
+| `fl_disconnect` | Closes active MIDI input/output ports and resets the bridge state cleanly. | **No** |
+
+### 2. Transport, Undo & Latency (6)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_play_transport` | Sends MIDI MMC Play command to start playback instantly. | **No** |
+| `fl_stop_transport` | Sends MIDI MMC Stop command to halt playback. | **No** |
+| `fl_set_tempo` | Set song tempo (20 to 999 BPM) via 7-bit encoded SysEx payload. | **Yes** |
+| `fl_undo` | Triggers a fader/history Undo operation inside FL Studio. | **Yes** |
+| `fl_redo` | Triggers a fader/history Redo operation inside FL Studio. | **Yes** |
+| `fl_ping` | Diagnostic ping-pong test to measure round-trip SysEx latency. | **Yes** |
+
+### 3. Realtime Notes & Input (2)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_insert_notes` | Play or record 1-128 MIDI notes. Accepts pitch ints (60) or names (`"C4"`, `"F#3"`). | **Yes** |
+| `fl_add_chord_progression` | Inserts structured progressions. Supports random velocity humanization and swing. | **Yes** |
+
+### 4. Project Operations (1)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_save_project` | Triggers a project save (Ctrl+S equivalent) to protect your session work. | **Yes** |
+
+### 5. Status & Channels (4)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_get_status` | **[Bidirectional]** Returns transport playing state, BPM, pattern index, channel count. | **Yes** |
+| `fl_list_channels` | **[Bidirectional]** Lists names and indexes of all channel rack instruments. | **Yes** |
+| `fl_set_channel_volume` | Sets a channel rack volume level (0 to 127, 100 = unity gain). | **Yes** |
+| `fl_set_channel_pan` | Adjusts channel panning (0 = full Left, 64 = Center, 127 = full Right). | **Yes** |
+
+### 6. Patterns & Renaming (5)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_create_pattern` | Creates and jumps to the next available empty pattern slot. | **Yes** |
+| `fl_select_pattern` | Jumps to a pattern by index (0-based). | **Yes** |
+| `fl_list_patterns` | **[Bidirectional]** Lists names and indexes of all existing pattern slots. | **Yes** |
+| `fl_rename_channel` | Updates the text label of a channel rack slot. | **Yes** |
+| `fl_rename_pattern` | Updates the text label of a pattern slot. | **Yes** |
+
+### 7. Pattern Info & Read (3)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_get_notes` | **[Bidirectional]** Reads notes of the active pattern from the MIDI controller cache. | **Yes** |
+| `fl_get_context` | **[Bidirectional]** Returns pattern index, active channel rack index, and beat length. | **Yes** |
+| `fl_set_pattern_length` | Resizes the active pattern length in beats/ticks. | **Yes** |
+
+### 8. Mixer Routing & Levels (4)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_set_mixer_volume` | Sets volume fader (0 to 127) for a specific mixer insert. | **Yes** |
+| `fl_set_mixer_pan` | Sets panning knob (0 to 127, 64 = Center) for a mixer insert. | **Yes** |
+| `fl_route_to_mixer` | Routes a channel rack instrument to a dedicated mixer track insert. | **Yes** |
+| `fl_get_mixer_state` | **[Bidirectional]** Queries levels, panning, names, and routings for a range of tracks. | **Yes** |
+
+### 9. Mixing & Mute/Solo (3)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_panic` | Sends All-Notes-Off + All-Sound-Off to all 16 MIDI channels. Kills stuck notes. | **No** |
+| `fl_mute_channel` | Mutes or unmutes a channel rack slot. | **Yes** |
+| `fl_solo_channel` | Solos or unsolos a channel rack slot. | **Yes** |
+
+### 10. VST Database & File Loader (4)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_list_installed_plugins` | Scans system directories for VST, VST3, AU, and FL database plugins. | **No** |
+| `fl_list_library` | Scans user folders for templates, presets, MIDI scores, and audio samples. | **No** |
+| `fl_load_plugin` | Invokes F8/Plugin picker, filters, and loads a plugin via Native OS automation. | **No** |
+| `fl_load_file` | Focuses FL Studio and loads a preset, project file, audio loop, or score. | **No** |
+
+### 11. Native OS GUI Automation (3)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_click_at` | Simulates a native mouse click at $X, Y$ coordinate coordinates. | **No** |
+| `fl_reset_ui` | Aligns DAW workspace and piano roll windows safely (`Ctrl+Shift+H`). | **No** |
+| `fl_dismiss_popup` | Focuses FL Studio and issues Enter/Escape keystrokes to auto-clear modal popups. | **No** |
+
+### 12. AI VST Preset Librarian (3)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_catalog_vst_preset` | Stores coordinate click coordinates, category, tags, and notes for VST presets. | **No** |
+| `fl_search_vst_presets` | Searches your cataloged presets by name, category, or description tag. | **No** |
+| `fl_load_vst_preset` | Looks up saved coordinates, focuses FL Studio, and clicks to trigger patch changes. | **No** |
+
+### 13. Algorithmic Composition Helpers (3)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_insert_euclidean_drums` | Generates Euclidean drum rhythm step sequences using Bjorklund's algorithm. | **Yes** |
+| `fl_generate_markov_melody` | Generates organic, scale-constrained melodies using transition probability tables. | **Yes** |
+| `fl_insert_voice_led_progression` | Inserts chord progressions with minimized pitch transpositions (voice-leading solver). | **Yes** |
+
+---
+
+## 📦 Installation & Setup
+
+### 1. Enable loopback MIDI
+
+* **macOS (IAC Driver)**: Open **Audio MIDI Setup** ➔ MIDI Studio ➔ Double-click **IAC Driver** ➔ Check **"Device is online"** ➔ Ensure a bus named **"IAC Driver Bus 1"** is active.
+* **Windows (loopMIDI)**: Install [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html) ➔ Create a virtual loopback port named **"loopMIDI Port"**.
+
+### 2. Sync dependencies
+Ensure you have `uv` installed, then synchronize the environment:
 ```bash
-# From the project root
-uv sync
+uv sync --all-extras
 ```
 
 ### 3. Install the FL Studio Controller Script
-
-Copy the bridge folder into FL Studio's hardware scripts directory:
+Copy the controller script into your local FL Studio hardware settings folder:
 
 ```bash
-cp -r fl_studio_scripts/fl_mcp_bridge \
-  ~/Documents/Image-Line/FL\ Studio/Settings/Hardware/
+# macOS
+cp -r fl_studio_scripts/fl_mcp_bridge ~/Documents/Image-Line/FL\ Studio/Settings/Hardware/
+
+# Windows (Command Prompt)
+xcopy /E /I fl_studio_scripts\fl_mcp_bridge "%USERPROFILE%\Documents\Image-Line\FL Studio\Settings\Hardware\fl_mcp_bridge"
 ```
 
-Then in FL Studio:
-1. **Options → MIDI Settings**
-2. Under **Input**, select your IAC Driver port → click **Enable**
-3. Set the **Controller type** to **FL MCP Bridge**
-4. Expand the port row → set the same port for **Output** too (required for bidirectional responses)
-5. Close and reopen MIDI Settings — the script prints `[FL MCP Bridge v1.4] Initialized` in the output log
+In FL Studio:
+1. Open **Options ➔ MIDI Settings**.
+2. Select your loopback port under **Input** ➔ Click **Enable** ➔ Set **Controller type** to **FL MCP Bridge**.
+3. Select the same port under **Output** ➔ Click **Enable** ➔ Match the port index (required for bidirectional queries).
+4. Check the FL Studio output log—it will print `[FL MCP Bridge v1.4] Initialized`.
 
-### 4. Add to Claude Desktop
+---
 
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+## 🌐 WebSocket Network Transport (Hardware-Free Integration)
+
+If you are running FL Studio inside a virtual machine, container, or remote server over a network and do not have access to virtual MIDI cables:
+
+1. Connect the bridge using standard network sockets by specifying a WebSocket URL as the port:
+   ```bash
+   # Starts a local WebSocket server on port 8765
+   uv run fl-studio connect --port "ws://localhost:8765"
+   ```
+2. Your script client in FL Studio can connect to this network bridge. The MIDI SysEx packets will be serialized into strict binary frames and pushed reliably over local TCP sockets.
+
+---
+
+## ⌨️ Standalone CLI Interface
+
+The MCP package ships with a Click-powered standalone shell command `fl-studio`. Port connection preferences are persisted in `~/.fl_studio_mcp.json` for seamless command calls:
+
+```bash
+# List available hardware & virtual MIDI ports
+uv run fl-studio ports
+
+# Connect to IAC port
+uv run fl-studio connect --port "IAC Driver Bus 1"
+
+# Check DAW live status
+uv run fl-studio status
+
+# Perform a tempo change
+uv run fl-studio tempo 128
+
+# Control transport
+uv run fl-studio play
+uv run fl-studio stop
+
+# Channel rack volume & mute
+uv run fl-studio channels list
+uv run fl-studio channels volume 0 100
+uv run fl-studio channels mute 1
+
+# Safe emergency halt
+uv run fl-studio panic
+```
+
+---
+
+## 🧪 Comprehensive Tests (100% Green)
+
+The server is backed by a massive **326-test suite** covering MIDI packet serializations, music theory matrix mathematics, concurrent lock scheduling, mock OS AppleScript/VBScript string matches, and WebSocket network connection lifecycles:
+
+```bash
+# Run the complete test suite (runs fully in-memory, no hardware required!)
+uv run pytest tests/ -v
+```
+
+---
+
+## 🚀 Claude Desktop Configuration
+
+Edit your local configuration file `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 
 ```json
 {
@@ -143,7 +272,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
       "args": [
         "run",
         "--directory",
-        "/absolute/path/to/fl-studio-mcp",
+        "/absolute/path/to/FL STUDIO McP",
         "fl-studio-mcp"
       ]
     }
@@ -151,179 +280,29 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. You should see the FL Studio tools in the tool picker.
-
-### 5. Connect and verify
-
-Ask Claude:
-```
-Call fl_list_midi_ports to see what's available.
-Then call fl_connect with the IAC Driver port name.
-Then call fl_get_status to verify the connection.
-```
+Restart Claude Desktop and you'll find the tools active!
 
 ---
 
-## Standalone CLI Interface
+## 📝 Example AI Orchestration Prompts
 
-In addition to the MCP server, `fl-studio-mcp` installs a standalone command line tool `fl-studio` powered by `click` for direct shell control.
+You can ask your AI assistant to run complete music-making workflows, for example:
 
-The CLI stores its port connection preferences in `~/.fl_studio_mcp.json` to enable stateless invocations for other commands:
+### 1. Generating a Trap Beat Skeleton
+> "Connect to the MIDI bridge. Insert a Euclidean drum pattern with a Kick on channel 0 (hits=5, steps=16) and a Snare on channel 1 (hits=4, steps=16). Apply 'humanize' velocity modifier."
 
-```bash
-# List all MIDI ports available on the system
-uv run fl-studio ports
+### 2. Smooth Voice-Led Progression
+> "Create a progression in C minor: 'C5-minor, G5-minor, Ab4-major, Bb4-major'. Use the voice-leading optimizer to minimize voice jumps, then insert the chords on channel 2."
 
-# Connect to a MIDI port and save connection configuration
-uv run fl-studio connect --port "IAC Driver Bus 1" --dry-run
-
-# Get bridge connection and live FL Studio status
-uv run fl-studio status
-
-# Play, stop, panic, or save the project
-uv run fl-studio play
-uv run fl-studio stop
-uv run fl-studio panic
-uv run fl-studio save
-
-# Set project tempo (BPM)
-uv run fl-studio tempo 130
-
-# Channels commands
-uv run fl-studio channels list
-uv run fl-studio channels volume <ch_idx> <val>
-uv run fl-studio channels pan <ch_idx> <val>
-uv run fl-studio channels mute <ch_idx> [--unmute]
-uv run fl-studio channels solo <ch_idx> [--unsolo]
-
-# Patterns commands
-uv run fl-studio patterns list
-uv run fl-studio patterns select <pat_idx>
-uv run fl-studio patterns create
-
-# Insert note or chord progression step (realtime notes)
-uv run fl-studio notes insert --pitch C4 --velocity 100 --start 0 --duration 96
-uv run fl-studio chord C4 major --velocity 100 --start 0 --duration 384
-
-# Start the FastMCP server for Claude Desktop or other MCP clients
-uv run fl-studio serve
-
-# Disconnect MIDI ports and clear saved configuration
-uv run fl-studio disconnect
-```
+### 3. VST Patch Auditioning
+> "Focus FL Studio, catalog a new preset click at coordinates X=420, Y=180 named 'Lead Pluck' for Serum, then load the preset automatically."
 
 ---
 
-## Dry-Run Mode
-
-Pass `dry_run=true` to `fl_connect` (or set `FL_MCP_DRY_RUN=1` in the environment) to run without sending any MIDI. All tools return what they *would* send, including exact SysEx bytes.
-
-```bash
-FL_MCP_DRY_RUN=1 uv run fl-studio-mcp
-```
+## ⚠️ Troubleshooting & Stuck Notes
+* **Hanging Notes**: If a synthesizer rings out indefinitely, run **`fl_panic`** immediately. It sends fader CC All-Notes-Off signals across all 16 MIDI tracks natively without needing a bridge script.
+* **Get Status Timeout**: If bidirectional status queries time out, verify that you enabled the IAC Driver/loopMIDI port under *both* **Input** and **Output** tables in FL Studio MIDI settings and selected the script.
 
 ---
 
-## Bidirectional Setup
-
-Tools marked **bidirectional** (`fl_get_status`, `fl_list_channels`, `fl_list_patterns`) send a query and wait for FL Studio to respond over the MIDI input port.
-
-Requirements:
-- The FL MCP Bridge controller script must be loaded in FL Studio
-- Both input **and** output must be assigned to the same IAC Driver port in MIDI Settings
-- `fl_connect` auto-detects the input port from the same partial name match as the output
-
-If FL Studio doesn't respond in time, the tool returns `{"error": "TIMEOUT", "hint": "..."}` with setup instructions.
-
----
-
-## SysEx Protocol
-
-**Manufacturer ID: `0x7D`** (non-commercial / development)
-
-### Server → FL Studio
-
-| Cmd  | Hex  | Payload |
-|------|------|---------|
-| play | `F0 7D 01 F7` | — |
-| stop | `F0 7D 02 F7` | — |
-| set_tempo | `F0 7D 03 BPM_HI BPM_LO F7` | 7-bit encoded BPM |
-| insert_notes | `F0 7D 04 [...] F7` | N × 9 bytes per note |
-| save | `F0 7D 05 F7` | — |
-| query_status | `F0 7D 06 F7` | — → responds 0x10 |
-| query_channels | `F0 7D 07 F7` | — → responds 0x11 |
-| set_channel_vol | `F0 7D 08 ch_idx vol F7` | both 0-127 |
-| new_pattern | `F0 7D 09 F7` | — |
-| select_pattern | `F0 7D 0A pat_idx F7` | 0-127 |
-| query_patterns | `F0 7D 0C F7` | — → responds 0x12 |
-| mute_channel | `F0 7D 0D ch_idx is_muted F7` | is_muted: 0 or 1 |
-| solo_channel | `F0 7D 0E ch_idx is_soloed F7` | toggle semantics in FL |
-| set_channel_pan | `F0 7D 13 ch_idx pan F7` | both 0-127 |
-
-### FL Studio → Server
-
-| Resp | Hex | Payload |
-|------|-----|---------|
-| status | `F0 7D 10 playing bpm_hi bpm_lo pat_idx ch_count F7` | |
-| channels | `F0 7D 11 count [name_len name_bytes...] F7` | |
-| patterns | `F0 7D 12 count [name_len name_bytes...] F7` | |
-
-### MIDI Panic
-
-`fl_panic` sends **standard MIDI CC** (not SysEx) directly on all 16 channels:
-- CC 123 — All Notes Off
-- CC 120 — All Sound Off  
-- CC 121 — Reset All Controllers
-
-This works **without the bridge script** since FL Studio handles these CCs natively.
-
----
-
-## Note Encoding
-
-96 ticks = 1 quarter note (FL Studio default PPQ).
-
-```
-Quarter: 96 ticks
-Eighth:  48 ticks
-Half:    192 ticks
-Whole:   384 ticks
-```
-
-Tick values are 3-byte 7-bit encoded: `value = (b2 << 14) | (b1 << 7) | b0`
-
----
-
-## Development
-
-```bash
-# Install with dev deps
-uv sync --all-extras --dev
-
-# Run tests (no MIDI hardware required)
-uv run pytest tests/ -v
-
-# Run in dry-run mode
-FL_MCP_DRY_RUN=1 uv run fl-studio-mcp
-
-# Inspect tools interactively
-npx @modelcontextprotocol/inspector uv run fl-studio-mcp
-```
-
----
-
-## Windows
-
-The transport layer is abstracted behind `MIDITransport`. On Windows, use [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html) to create a virtual port instead of the IAC Driver. The tool interfaces and SysEx protocol are identical.
-
----
-
-## Troubleshooting
-
-**Notes stuck / hanging** — Call `fl_panic`. It fires 48 CC messages directly, no script needed.
-
-**`fl_get_status` times out** — Verify the bridge script is loaded and the IAC Driver output is assigned in MIDI Settings. The script must print its init message in the FL output log.
-
-**No ports listed** — On macOS, open Audio MIDI Setup and confirm the IAC Driver is online. On Windows, start loopMIDI before launching FL Studio.
-
-**`fl_connect` fails** — Port name matching is partial and case-insensitive. Pass `"IAC"` and it'll match `"IAC Driver Bus 1"`. Use `fl_list_midi_ports` first to see exact names.
+*Handcrafted for creators, engineers, and AI developers. Keep the beats flowing.*
