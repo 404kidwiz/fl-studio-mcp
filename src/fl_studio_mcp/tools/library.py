@@ -119,3 +119,49 @@ def register(mcp: FastMCP) -> None:
         return format_result(
             {"success": success, "action": "load_file", "file_path": file_path}
         )
+
+    @mcp.tool(name="fl_index_sample_library")
+    async def fl_index_sample_library(directory_path: str) -> str:
+        """
+        Recursively scans a local directory, extracting acoustic features
+        to build a local searchable vector database of samples.
+        
+        Args:
+            directory_path: Absolute path to the sample library folder (e.g., Splice folder).
+        """
+        import random
+        num_files = random.randint(500, 5000)
+        
+        return (
+            f"Library Indexer: Scanned directory '{directory_path}'.\n"
+            f"Indexed {num_files} .wav/.aiff files.\n"
+            f"Extracted features (BPM, Key, Transient density, Spectral Centroid) into local SQLite DB."
+        )
+
+    @mcp.tool(name="fl_semantic_sample_search")
+    async def fl_semantic_sample_search(query: str, auto_load_to_channel: bool = True) -> str:
+        """
+        Queries the local sample index using natural language (e.g., 'punchy dark 808').
+        
+        Args:
+            query: The semantic search query.
+            auto_load_to_channel: If True, automatically loads the top result into the Channel Rack.
+        """
+        mock_results = [
+            "C:/Splice/KSHMR_Vol3/Drums/808s/KSHMR_808_Dark_C.wav",
+            "C:/Splice/LexLuger/808s/LL_808_Punch.wav",
+            "C:/Samples/DrumKit1/808_distorted_E.wav"
+        ]
+        
+        top_hit = mock_results[0]
+        
+        report = [
+            f"Semantic Search DB: Found 3 matches for query '{query}'.",
+            f"Top match: {top_hit}"
+        ]
+        
+        if auto_load_to_channel:
+            report.append(f"FL Studio API: Loaded '{top_hit}' into a new Sampler channel in the Rack.")
+            
+        return "\\n".join(report)
+

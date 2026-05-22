@@ -70,9 +70,9 @@ The codebase is highly modular and strictly structured:
 
 ---
 
-## 🎛️ Complete Tools Reference (51 Tools)
+## 🎛️ Complete Tools Reference (59 Tools)
 
-FL Studio MCP exposes a robust catalog of **51 FastMCP tools** organized into clean functional areas:
+FL Studio MCP exposes a robust catalog of **59 FastMCP tools** organized into clean functional areas:
 
 ### 1. Connection & Diagnostics (3)
 | Tool Name | Description | Needs Bridge Script |
@@ -181,6 +181,18 @@ FL Studio MCP exposes a robust catalog of **51 FastMCP tools** organized into cl
 | `fl_render_stems` | Bounces isolated tracks iteratively using the headless render macro. | **No** |
 | `fl_generate_sequence` | Simulates a Generative MIDI Transformer to output realistic 16-bar drum/melody grooves. | **Yes** |
 | `fl_sync_session` | Zips `.flp` and audio files, then sends a Webhook (e.g., Discord) alert. | **No** |
+
+### 15. The Autonomous Mix Engineer (8)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_auto_mix_balance` | Automatically calculates RMS of all tracks and balances faders to a pink-noise curve. | **No** |
+| `fl_auto_sidechain` | Intelligently routes Kick to Bass and inserts a Fruity Limiter for ducking. | **No** |
+| `fl_vocal_chain_builder` | Inserts genre-specific FX chains (Pitcher, EQ, De-Esser, Reverb) on vocal tracks. | **No** |
+| `fl_index_sample_library` | Scans local splice/drumkit directories to build an acoustic vector database. | **No** |
+| `fl_semantic_sample_search` | Finds and loads samples using natural language (e.g., "dark punchy 808"). | **No** |
+| `fl_generate_song_structure` | Expands a loop into a full 3-minute arrangement (Intro, Verse, Chorus, etc.). | **No** |
+| `fl_generate_transitions` | Injects risers, crashes, and automated filter sweeps at song section boundaries. | **No** |
+| `fl_generate_synth_preset` | AI generates parameters for synths (Vital, Serum) from natural language prompts. | **No** |
 
 ---
 

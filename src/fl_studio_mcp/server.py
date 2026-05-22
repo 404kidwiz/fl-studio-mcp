@@ -48,6 +48,9 @@ from .tools import (
     stems,
     midi_gen,
     collaboration,
+    mix_engineer,
+    arranger,
+    sound_design,
 )
 
 from . import resources, prompts
@@ -99,6 +102,9 @@ vision.register(mcp)
 stems.register(mcp)
 midi_gen.register(mcp)
 collaboration.register(mcp)
+mix_engineer.register(mcp)
+arranger.register(mcp)
+sound_design.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)
