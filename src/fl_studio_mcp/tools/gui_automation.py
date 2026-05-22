@@ -15,24 +15,26 @@ def register(mcp: FastMCP) -> None:
             "openWorldHint": True,
         },
     )
-    async def fl_click_at(x: int, y: int, delay_ms: int = 100) -> str:
+    async def fl_click_at(x: int, y: int, delay_ms: int = 100, relative: bool = True) -> str:
         """Simulate a mouse click at specific coordinates to control custom VST elements or preset selectors.
 
         Args:
-            x: X-coordinate in pixels from top-left.
-            y: Y-coordinate in pixels from top-left.
+            x: X-coordinate in pixels.
+            y: Y-coordinate in pixels.
             delay_ms: Milliseconds delay after focusing but before clicking.
+            relative: If True, coordinates are relative to the active FL Studio window (default: True).
 
         Returns:
             str: JSON indicating success or failure.
         """
         automation = get_automation()
-        success = automation.click_at(x, y, delay_ms)
+        success = automation.click_at(x, y, delay_ms, relative)
         return format_result({
             "success": success,
             "action": "click_at",
             "coordinates": {"x": x, "y": y},
-            "delay_ms": delay_ms
+            "delay_ms": delay_ms,
+            "relative": relative
         })
 
     @mcp.tool(

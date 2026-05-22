@@ -17,6 +17,18 @@ class MacOSAutomation(GUIAutomation):
         except Exception:
             return False
 
+    def _run_applescript_with_output(self, script: str) -> tuple[bool, str]:
+        try:
+            res = subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            return res.returncode == 0, res.stdout.strip()
+        except Exception as e:
+            return False, str(e)
+
     def focus_fl_studio(self) -> bool:
         script = 'tell application "FL Studio" to activate'
         # Fallback query to find running FL Studio versions like "FL Studio 21" or "FL Studio 24"
@@ -78,14 +90,41 @@ class MacOSAutomation(GUIAutomation):
         except Exception:
             return False
 
-    def click_at(self, x: int, y: int, delay_ms: int = 100) -> bool:
+    def click_at(self, x: int, y: int, delay_ms: int = 100, relative: bool = True) -> bool:
         if not self.focus_fl_studio():
             return False
+        
+        click_x, click_y = x, y
+        if relative:
+            pos_script = (
+                'tell application "System Events"\n'
+                '    tell process "FL Studio"\n'
+                '        try\n'
+                '            set win to window 1\n'
+                '            set {winX, winY} to position of win\n'
+                '            return "" & winX & "," & winY\n'
+                '        on error\n'
+                '            return "0,0"\n'
+                '        end try\n'
+                '    end tell\n'
+                'end tell'
+            )
+            success, output = self._run_applescript_with_output(pos_script)
+            if success and output and "," in output:
+                try:
+                    parts = output.split(",")
+                    if len(parts) == 2:
+                        win_x, win_y = int(parts[0].strip()), int(parts[1].strip())
+                        click_x = win_x + x
+                        click_y = win_y + y
+                except Exception:
+                    pass
+
         if delay_ms > 0:
             time.sleep(delay_ms / 1000.0)
         script = (
             'tell application "System Events"\n'
-            f'    click at {{{x}, {y}}}\n'
+            f'    click at {{{click_x}, {click_y}}}\n'
             'end tell'
         )
         return self._run_applescript(script)

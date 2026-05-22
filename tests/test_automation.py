@@ -86,6 +86,35 @@ def test_macos_automation_methods():
         args = mock_run.call_args[0][0]
         assert "key code 53" in args[2]
 
+def test_macos_automation_relative_click():
+    """Test MacOSAutomation click_at with relative coordinates."""
+    auto = MacOSAutomation()
+    with patch("subprocess.run") as mock_run:
+        # First call (focus) returns success
+        # Second call (pos_script) returns window position "150,250"
+        # Third call (click script) returns success
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="success"),
+            MagicMock(returncode=0, stdout="150,250"),
+            MagicMock(returncode=0, stdout="success")
+        ]
+        assert auto.click_at(100, 200, delay_ms=0, relative=True) is True
+        # Verify the click coordinates are window offset (150+100, 250+200) = (250, 450)
+        args = mock_run.call_args[0][0]
+        assert "click at {250, 450}" in args[2]
+
+def test_macos_automation_absolute_click():
+    """Test MacOSAutomation click_at with absolute coordinates."""
+    auto = MacOSAutomation()
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="success"),
+            MagicMock(returncode=0, stdout="success")
+        ]
+        assert auto.click_at(100, 200, delay_ms=0, relative=False) is True
+        args = mock_run.call_args[0][0]
+        assert "click at {100, 200}" in args[2]
+
 def test_windows_automation_methods():
     """Test WindowsAutomation VBScript generation and cscript execution."""
     auto = WindowsAutomation()
@@ -146,6 +175,31 @@ def test_windows_automation_methods():
         mock_file.reset_mock()
         assert auto.dismiss_popup("cancel") is True
         assert "SendKeys \"{ESC}\"" in mock_file.write.call_args[0][0]
+
+def test_windows_automation_relative_click():
+    """Test WindowsAutomation click_at with relative coordinates and scaling."""
+    auto = WindowsAutomation()
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="")
+        with patch.object(auto, "focus_fl_studio", return_value=True):
+            assert auto.click_at(100, 200, delay_ms=0, relative=True) is True
+            ps_cmd = mock_run.call_args[0][0][5]
+            assert "100" in ps_cmd
+            assert "200" in ps_cmd
+            assert "$click_x = $left + [int](100 * $scale)" in ps_cmd
+            assert "$click_y = $top + [int](200 * $scale)" in ps_cmd
+
+def test_windows_automation_absolute_click():
+    """Test WindowsAutomation click_at with absolute coordinates."""
+    auto = WindowsAutomation()
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="")
+        with patch.object(auto, "focus_fl_studio", return_value=True):
+            assert auto.click_at(100, 200, delay_ms=0, relative=False) is True
+            ps_cmd = mock_run.call_args[0][0][5]
+            assert "if ($false)" in ps_cmd
+            assert "$click_x = 100;" in ps_cmd
+            assert "$click_y = 200;" in ps_cmd
 
 def test_windows_open_file():
     """Test WindowsAutomation open_file handles os.startfile or cmd shell fallback."""

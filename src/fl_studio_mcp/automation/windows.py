@@ -86,21 +86,66 @@ class WindowsAutomation(GUIAutomation):
         except Exception:
             return False
 
-    def click_at(self, x: int, y: int, delay_ms: int = 100) -> bool:
+    def click_at(self, x: int, y: int, delay_ms: int = 100, relative: bool = True) -> bool:
         if not self.focus_fl_studio():
             return False
         
-        # Construct powershell script
-        ps_script = (
-            "Add-Type -AssemblyName System.Windows.Forms; "
-            "Add-Type -AssemblyName System.Drawing; "
-            "$signature = '[DllImport(\"user32.dll\")] public static extern void mouse_event(int flags, int dx, int dy, int cButtons, int dwExtraInfo);'; "
-            "Add-Type -MemberDefinition $signature -Name Mouse -Namespace Win32; "
-            f"[System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point({x}, {y}); "
-            f"Start-Sleep -Milliseconds {delay_ms}; "
-            "[Win32.Mouse]::mouse_event(0x02, 0, 0, 0, 0); " # MOUSEEVENTF_LEFTDOWN = 0x02
-            "[Win32.Mouse]::mouse_event(0x04, 0, 0, 0, 0);"  # MOUSEEVENTF_LEFTUP = 0x04
-        )
+        # Use PowerShell to find FL Studio window position (TFruityLoopsInstance), 
+        # apply DPI scaling factor, and perform the click using relative coordinates.
+        relative_val = "$true" if relative else "$false"
+        ps_script = f"""
+Add-Type -AssemblyName System.Windows.Forms;
+Add-Type -AssemblyName System.Drawing;
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {{
+    [DllImport("user32.dll")]
+    public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+    [DllImport("user32.dll")]
+    public static extern void mouse_event(int flags, int dx, int dy, int cButtons, int dwExtraInfo);
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT {{
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }}
+}}
+"@;
+$hWnd = [Win32]::FindWindow("TFruityLoopsInstance", $null);
+if ($hWnd -eq [IntPtr]::Zero) {{
+    $proc = Get-Process -Name "FL Studio*" -ErrorAction SilentlyContinue | Select-Object -First 1;
+    if ($proc) {{ $hWnd = $proc.MainWindowHandle; }}
+}}
+if ($hWnd -eq [IntPtr]::Zero) {{
+    $hWnd = [Win32]::FindWindow($null, "FL Studio");
+}}
+$graphics = [System.Drawing.Graphics]::FromHwnd([IntPtr]::Zero);
+$scale = $graphics.DpiX / 96.0;
+$graphics.Dispose();
+$left = 0; $top = 0;
+if ($hWnd -ne [IntPtr]::Zero) {{
+    $rect = New-Object Win32+RECT;
+    if ([Win32]::GetWindowRect($hWnd, [ref]$rect)) {{
+        $left = $rect.Left;
+        $top = $rect.Top;
+    }}
+}}
+if ({relative_val}) {{
+    $click_x = $left + [int]({x} * $scale);
+    $click_y = $top + [int]({y} * $scale);
+}} else {{
+    $click_x = {x};
+    $click_y = {y};
+}}
+[System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($click_x, $click_y);
+Start-Sleep -Milliseconds {delay_ms};
+[Win32]::mouse_event(0x02, 0, 0, 0, 0);
+[Win32]::mouse_event(0x04, 0, 0, 0, 0);
+"""
         try:
             res = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],

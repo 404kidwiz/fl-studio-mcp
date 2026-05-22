@@ -38,13 +38,14 @@ class GUIAutomation(ABC):
         pass
 
     @abstractmethod
-    def click_at(self, x: int, y: int, delay_ms: int = 100) -> bool:
+    def click_at(self, x: int, y: int, delay_ms: int = 100, relative: bool = True) -> bool:
         """Move the mouse cursor to (x, y) and perform a left click.
 
         Args:
-            x: X-coordinate in pixels from top-left.
-            y: Y-coordinate in pixels from top-left.
+            x: X-coordinate in pixels.
+            y: Y-coordinate in pixels.
             delay_ms: Delay in milliseconds after moving but before clicking.
+            relative: If True, coordinates are relative to active FL Studio window.
 
         Returns:
             bool: True if successful, False otherwise.
