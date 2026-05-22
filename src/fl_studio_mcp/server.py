@@ -60,6 +60,12 @@ from .tools import (
     video_generation,
     project_vc,
     spatial_audio,
+    performance,
+    remix,
+    generative_vocals,
+    hardware,
+    optimization,
+    release,
 )
 
 from . import resources, prompts
@@ -123,6 +129,12 @@ vocal_alignment.register(mcp)
 video_generation.register(mcp)
 project_vc.register(mcp)
 spatial_audio.register(mcp)
+performance.register(mcp)
+remix.register(mcp)
+generative_vocals.register(mcp)
+hardware.register(mcp)
+optimization.register(mcp)
+release.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)

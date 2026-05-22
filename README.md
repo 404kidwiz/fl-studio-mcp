@@ -25,7 +25,7 @@
 
 ## 🎼 Overwhelming Developer & Producer Power
 
-**FL Studio MCP** acts as an intelligent, high-fidelity bridge that exposes FL Studio to any Model Context Protocol (MCP) client—like Claude Desktop. By translating high-level agentic instructions into real-time MIDI SysEx commands, OS-native window automation routines, and deep theory algorithms, this server lets you orchestrate complete musical compositions, mix channels, route signals, and catalog third-party VST presets completely in code or via conversational chat.
+The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **81 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, and version control—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
 
 Whether you're looking to generate complex polyrhythms, optimize harmonic chord voicings, or automate a visual click inside Serum, the FL Studio MCP gives you full, type-safe, dry-run-capable control over your DAW.
 
@@ -70,9 +70,9 @@ The codebase is highly modular and strictly structured:
 
 ---
 
-## 🧰 The Toolkit (71 Tools)
+## 🧰 The Toolkit (81 Tools)
 
-FL Studio MCP exposes a massively comprehensive suite of **71 distinct tools**, broken down by production phase:
+FL Studio MCP exposes a massively comprehensive suite of **81 distinct tools**, broken down by production phase:
 
 ### 1. Connection & Diagnostics (3)
 | Tool Name | Description | Needs Bridge Script |
@@ -203,12 +203,24 @@ FL Studio MCP exposes a massively comprehensive suite of **71 distinct tools**, 
 - `fl_generate_counter_melody` – Analyzes a chord progression to generate a complementary counter-melody.
 - `fl_build_patcher_instrument` – Programmatically builds a complex layered instrument using FL Studio's Patcher.
 
-### 🌐 Phase 11: The Executive Producer
-- `fl_vst_auto_replace` – Detects missing 3rd-party VSTs and mathematically matches a native equivalent.
-- `fl_vocal_aligner` – Native time-warping automation to phase-align background vocals to a lead.
-- `fl_generate_visualizer_zgame` – Automatically generates a 3D audio-reactive music video synced to the beat.
-- `fl_project_version_control` – Implements Git-style branching (commit, checkout) for FLP project files.
-- `fl_export_dolby_atmos_stems` – Formats, groups, and bounces the session perfectly for Dolby Atmos mixing.
+#### **Phase 11: The Executive Producer (Tools 67 - 71)**
+*   **`fl_vst_parameter_bridge_macro`**: Create multi-parameter macro knobs for VSTs.
+*   **`fl_multi_track_vocal_align`**: Align multiple vocal dubs/harmonies to a lead vocal track.
+*   **`fl_zge_video_wizard`**: Generate reactive visuals based on track stems using ZGE Visualizer.
+*   **`fl_project_version_control`**: Track and manage multiple versions/mixes of an FLP.
+*   **`fl_spatial_audio_panner`**: Automate Dolby Atmos/Binaural panning for spatial mixing.
+
+#### **Phase 12: The God-Tier Producer (Tools 72 - 81)**
+*   **`fl_live_performance_mode`**: Trigger loops and clips in FL's Performance Mode.
+*   **`fl_stem_separation_remix`**: Extract acapella and generate an instrumental remix.
+*   **`fl_foley_to_drumkit`**: Slice foley transients and map them to Slicex.
+*   **`fl_vocal_synth_vocodex`**: Route vocals and synths into Vocodex automatically.
+*   **`fl_lyric_to_vocal_take`**: Generate TTS audio and align it using Pitcher.
+*   **`fl_hardware_cv_gate_bridge`**: Send CV signals to external modular gear.
+*   **`fl_advanced_groove_extractor`**: Extract groove from audio and apply to MIDI.
+*   **`fl_cpu_optimizer_bounce`**: Identify high CPU VSTs and Bounce in Place.
+*   **`fl_collaborative_cloud_sync`**: Package and upload project for remote collaboration.
+*   **`fl_industry_metadata_tagger`**: Embed ISRC codes and ASCAP splits into exported WAV.
 
 ---
 
