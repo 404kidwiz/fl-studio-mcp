@@ -83,7 +83,7 @@ To register the FL Studio MCP server with Claude Desktop, edit the `claude_deskt
       "command": "uv",
       "args": [
         "--directory",
-        "/Users/dawizkidmal/Desktop/404 Projects/FL STUDIO McP",
+        "/absolute/path/to/fl-studio-mcp",
         "run",
         "fl-studio-mcp"
       ],
@@ -105,7 +105,7 @@ If you are controlling a remote or containerized FL Studio instance over WebSock
       "command": "uv",
       "args": [
         "--directory",
-        "/Users/dawizkidmal/Desktop/404 Projects/FL STUDIO McP",
+        "/absolute/path/to/fl-studio-mcp",
         "run",
         "fl-studio-mcp"
       ],

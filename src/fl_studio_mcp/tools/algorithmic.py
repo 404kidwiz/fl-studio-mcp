@@ -2,7 +2,7 @@
 
 import json
 import re
-from typing import List, Dict, Any, Union, Optional
+from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from ..bridge import FLStudioBridge, format_result
@@ -53,7 +53,7 @@ def parse_chord_string(s: str) -> tuple[str, str]:
         quality_str = m.group(2).strip()
         if not quality_str:
             quality_str = "major"
-        
+
         # Map common abbreviations to supported CHORDS qualities:
         q_lower = quality_str.lower()
         if q_lower in ("m", "min", "minor"):
@@ -76,7 +76,6 @@ def parse_chord_string(s: str) -> tuple[str, str]:
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_insert_euclidean_drums",
         annotations={
@@ -128,24 +127,30 @@ def register(mcp: FastMCP) -> None:
                 override_hits = value.get("hits", params.hits)
                 override_steps = value.get("steps", params.steps)
                 override_rotation = value.get("rotation", params.rotation)
-                rhythm_pattern = generate_euclidean_rhythm(override_hits, override_steps, override_rotation)
+                rhythm_pattern = generate_euclidean_rhythm(
+                    override_hits, override_steps, override_rotation
+                )
                 pitch = override_pitch
             else:
                 # Value is treated as a pitch and mapped to main Euclidean rhythm parameters
                 pitch = parse_pitch_value(value)
-                rhythm_pattern = generate_euclidean_rhythm(params.hits, params.steps, params.rotation)
+                rhythm_pattern = generate_euclidean_rhythm(
+                    params.hits, params.steps, params.rotation
+                )
 
             for step_idx, hit in enumerate(rhythm_pattern):
                 if hit:
                     # In case of custom sequence, we don't have default pitch in sequence, use 60
                     p = pitch if not isinstance(value, list) else 60
-                    note_dicts.append({
-                        "pitch": p,
-                        "velocity": 100,
-                        "start_tick": params.start_tick + step_idx * step_ticks,
-                        "duration_ticks": step_ticks,
-                        "channel": chan_idx,
-                    })
+                    note_dicts.append(
+                        {
+                            "pitch": p,
+                            "velocity": 100,
+                            "start_tick": params.start_tick + step_idx * step_ticks,
+                            "duration_ticks": step_ticks,
+                            "channel": chan_idx,
+                        }
+                    )
 
         if not note_dicts:
             return format_result(
@@ -161,7 +166,10 @@ def register(mcp: FastMCP) -> None:
         )
 
         max_chunk_size = 32
-        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+        note_chunks = [
+            note_dicts[i : i + max_chunk_size]
+            for i in range(0, len(note_dicts), max_chunk_size)
+        ]
 
         last_result = None
         try:
@@ -214,18 +222,23 @@ def register(mcp: FastMCP) -> None:
             )
         except ValueError as exc:
             return format_result(
-                FLMCPError(ErrorCode.INVALID_PARAMS, f"Failed to generate Markov pitches: {exc}").to_dict()
+                FLMCPError(
+                    ErrorCode.INVALID_PARAMS,
+                    f"Failed to generate Markov pitches: {exc}",
+                ).to_dict()
             )
 
         note_dicts = []
         for idx, pitch in enumerate(pitches):
-            note_dicts.append({
-                "pitch": pitch,
-                "velocity": 100,
-                "start_tick": params.start_tick + idx * step_ticks,
-                "duration_ticks": step_ticks,
-                "channel": params.channel_index,
-            })
+            note_dicts.append(
+                {
+                    "pitch": pitch,
+                    "velocity": 100,
+                    "start_tick": params.start_tick + idx * step_ticks,
+                    "duration_ticks": step_ticks,
+                    "channel": params.channel_index,
+                }
+            )
 
         # Apply modifiers
         note_dicts = apply_composition_modifiers(
@@ -233,7 +246,10 @@ def register(mcp: FastMCP) -> None:
         )
 
         max_chunk_size = 32
-        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+        note_chunks = [
+            note_dicts[i : i + max_chunk_size]
+            for i in range(0, len(note_dicts), max_chunk_size)
+        ]
 
         last_result = None
         try:
@@ -261,7 +277,9 @@ def register(mcp: FastMCP) -> None:
             "openWorldHint": False,
         },
     )
-    async def fl_insert_voice_led_progression(params: InsertVoiceLedProgressionInput) -> str:
+    async def fl_insert_voice_led_progression(
+        params: InsertVoiceLedProgressionInput,
+    ) -> str:
         """Insert a chord progression where octaves/inversions are optimized to minimize voice jumping.
 
         Uses minimum absolute distance transposition solver to smooth transitions.
@@ -270,7 +288,9 @@ def register(mcp: FastMCP) -> None:
 
         if not params.progression.strip():
             return format_result(
-                FLMCPError(ErrorCode.INVALID_PARAMS, "progression string cannot be empty.").to_dict()
+                FLMCPError(
+                    ErrorCode.INVALID_PARAMS, "progression string cannot be empty."
+                ).to_dict()
             )
 
         chord_strings = [c.strip() for c in params.progression.split(",") if c.strip()]
@@ -292,7 +312,7 @@ def register(mcp: FastMCP) -> None:
                 return format_result(
                     FLMCPError(
                         ErrorCode.INVALID_PARAMS,
-                        f"Failed parsing chord '{chord_str}': {exc}"
+                        f"Failed parsing chord '{chord_str}': {exc}",
                     ).to_dict()
                 )
 
@@ -300,20 +320,24 @@ def register(mcp: FastMCP) -> None:
             optimized_chords = optimize_voice_leading(chords_pitches)
         except Exception as exc:
             return format_result(
-                FLMCPError(ErrorCode.UNKNOWN, f"Voice-leading optimization failed: {exc}").to_dict()
+                FLMCPError(
+                    ErrorCode.UNKNOWN, f"Voice-leading optimization failed: {exc}"
+                ).to_dict()
             )
 
         note_dicts = []
         for c_idx, chord in enumerate(optimized_chords):
             start_offset = params.start_tick + c_idx * step_ticks
             for pitch in chord:
-                note_dicts.append({
-                    "pitch": pitch,
-                    "velocity": 100,
-                    "start_tick": start_offset,
-                    "duration_ticks": step_ticks,
-                    "channel": params.channel_index,
-                })
+                note_dicts.append(
+                    {
+                        "pitch": pitch,
+                        "velocity": 100,
+                        "start_tick": start_offset,
+                        "duration_ticks": step_ticks,
+                        "channel": params.channel_index,
+                    }
+                )
 
         # Apply modifiers
         note_dicts = apply_composition_modifiers(
@@ -321,7 +345,10 @@ def register(mcp: FastMCP) -> None:
         )
 
         max_chunk_size = 32
-        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+        note_chunks = [
+            note_dicts[i : i + max_chunk_size]
+            for i in range(0, len(note_dicts), max_chunk_size)
+        ]
 
         last_result = None
         try:

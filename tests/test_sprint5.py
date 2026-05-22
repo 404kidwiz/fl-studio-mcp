@@ -3,7 +3,6 @@
 Includes protocol tests, MCP tool behaviors, and Click CLI commands.
 """
 
-import asyncio
 import json
 import pytest
 import unittest.mock
@@ -27,6 +26,7 @@ from fl_studio_mcp.protocol import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def parse(result: str) -> dict:
     return json.loads(result)
 
@@ -39,6 +39,7 @@ def _inject_response(bridge: FLStudioBridge, cmd: int, payload: list) -> None:
 def _tool(module_name: str, tool_name: str):
     """Import the connection/project tool module and return its registered function."""
     from mcp.server.fastmcp import FastMCP
+
     if module_name == "connection":
         from fl_studio_mcp.tools import connection as mod
     else:
@@ -59,13 +60,14 @@ def mock_home(tmp_path, monkeypatch):
 # 1. Protocol Tests
 # ---------------------------------------------------------------------------
 
+
 class TestSprint5Protocol:
     def test_encode_ping(self):
         raw = encode_ping(42)
         assert raw[0] == 0xF0
         assert raw[1] == 0x7D
         assert raw[2] == 0x18  # CMD_PING
-        assert raw[3] == 42    # challenge
+        assert raw[3] == 42  # challenge
         assert raw[-1] == 0xF7
 
     def test_encode_ping_bounds(self):
@@ -93,6 +95,7 @@ class TestSprint5Protocol:
 # 2. MCP Tool Tests
 # ---------------------------------------------------------------------------
 
+
 class TestSprint5Tools:
     async def test_fl_ping_dry_run(self, dry_bridge):
         fn = _tool("connection", "fl_ping")
@@ -111,6 +114,7 @@ class TestSprint5Tools:
             if cmd == CMD_PING:
                 # Echo challenge back
                 _inject_response(dry_bridge, CMD_PING, [payload[0]])
+
         dry_bridge._output_port.send = mock_send
 
         fn = _tool("connection", "fl_ping")
@@ -155,6 +159,7 @@ class TestSprint5Tools:
             if cmd == CMD_UNDO:
                 # Send RESP_ACK (0x1F) with CMD_UNDO in payload
                 _inject_response(dry_bridge, RESP_ACK, [CMD_UNDO])
+
         dry_bridge._output_port.send = mock_send
 
         fn = _tool("project", "fl_undo")
@@ -178,6 +183,7 @@ class TestSprint5Tools:
             if cmd == CMD_REDO:
                 # Send RESP_ACK (0x1F) with CMD_REDO in payload
                 _inject_response(dry_bridge, RESP_ACK, [CMD_REDO])
+
         dry_bridge._output_port.send = mock_send
 
         fn = _tool("project", "fl_redo")
@@ -195,6 +201,7 @@ class TestSprint5Tools:
 # ---------------------------------------------------------------------------
 # 3. CLI Command Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSprint5CLI:
     def test_cli_ping_dry_run(self, mock_home):

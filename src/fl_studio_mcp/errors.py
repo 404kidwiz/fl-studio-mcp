@@ -38,4 +38,5 @@ class FLMCPError(Exception):
 
     def __str__(self) -> str:
         import json
+
         return json.dumps(self.to_dict(), indent=2)

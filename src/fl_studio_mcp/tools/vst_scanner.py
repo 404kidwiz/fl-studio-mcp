@@ -1,17 +1,19 @@
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict
 from mcp.server.fastmcp import FastMCP
 
 from ..bridge import format_result
 from ..automation import get_automation
+
 
 def get_fl_user_data_path() -> Path:
     """Finds the user's FL Studio User Data folder cross-platform."""
     if sys.platform == "win32":
         try:
             import ctypes
+
             buf = ctypes.create_unicode_buffer(1024)
             # CSIDL_PERSONAL (Documents folder) is 5
             ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf)
@@ -22,14 +24,17 @@ def get_fl_user_data_path() -> Path:
         doc_path = Path.home() / "Documents"
 
     fl_path = doc_path / "Image-Line" / "FL Studio"
-    
+
     # Handle OneDrive documents folder on Windows
     if sys.platform == "win32" and not fl_path.exists():
-        onedrive_path = Path.home() / "OneDrive" / "Documents" / "Image-Line" / "FL Studio"
+        onedrive_path = (
+            Path.home() / "OneDrive" / "Documents" / "Image-Line" / "FL Studio"
+        )
         if onedrive_path.exists():
             fl_path = onedrive_path
 
     return fl_path
+
 
 def scan_plugin_database() -> Dict[str, List[Dict[str, str]]]:
     """Scan the user's categorized FL Studio plugin database (Generators & Effects).
@@ -40,10 +45,7 @@ def scan_plugin_database() -> Dict[str, List[Dict[str, str]]]:
     user_data_path = get_fl_user_data_path()
     plugin_db_path = user_data_path / "Presets" / "Plugin database"
 
-    result = {
-        "generators": [],
-        "effects": []
-    }
+    result = {"generators": [], "effects": []}
 
     if not plugin_db_path.exists():
         return result
@@ -59,13 +61,16 @@ def scan_plugin_database() -> Dict[str, List[Dict[str, str]]]:
                     rel_path = Path(root).relative_to(cat_path)
                     subcat = str(rel_path) if rel_path != Path(".") else "Unsorted"
                     name = Path(file).stem
-                    result[category.lower()].append({
-                        "name": name,
-                        "category": subcat,
-                        "path": str(Path(root) / file)
-                    })
+                    result[category.lower()].append(
+                        {
+                            "name": name,
+                            "category": subcat,
+                            "path": str(Path(root) / file),
+                        }
+                    )
 
     return result
+
 
 def scan_system_plugins() -> List[Dict[str, str]]:
     """Scan system folders for installed plugins (VST, VST3, AU).
@@ -75,7 +80,7 @@ def scan_system_plugins() -> List[Dict[str, str]]:
     """
     plugins = []
 
-    if sys.platform == "darwin": # macOS
+    if sys.platform == "darwin":  # macOS
         mac_paths = [
             ("/Library/Audio/Plug-Ins/Components", "AU"),
             ("~/Library/Audio/Plug-Ins/Components", "AU"),
@@ -88,29 +93,33 @@ def scan_system_plugins() -> List[Dict[str, str]]:
             path = Path(raw_path).expanduser()
             if not path.exists():
                 continue
-            
+
             for item in path.iterdir():
                 if item.name.startswith("."):
                     continue
                 if item.suffix.lower() in [".component", ".vst", ".vst3"]:
-                    plugins.append({
-                        "name": item.stem,
-                        "format": fmt,
-                        "path": str(item)
-                    })
+                    plugins.append(
+                        {"name": item.stem, "format": fmt, "path": str(item)}
+                    )
                 elif item.is_dir():
                     try:
                         for sub_item in item.iterdir():
-                            if sub_item.suffix.lower() in [".component", ".vst", ".vst3"]:
-                                plugins.append({
-                                    "name": sub_item.stem,
-                                    "format": fmt,
-                                    "path": str(sub_item)
-                                })
+                            if sub_item.suffix.lower() in [
+                                ".component",
+                                ".vst",
+                                ".vst3",
+                            ]:
+                                plugins.append(
+                                    {
+                                        "name": sub_item.stem,
+                                        "format": fmt,
+                                        "path": str(sub_item),
+                                    }
+                                )
                     except OSError:
                         pass
 
-    elif sys.platform == "win32": # Windows
+    elif sys.platform == "win32":  # Windows
         win_paths = [
             ("C:\\Program Files\\Common Files\\VST3", "VST3"),
             ("C:\\Program Files (x86)\\Common Files\\VST3", "VST3"),
@@ -134,13 +143,16 @@ def scan_system_plugins() -> List[Dict[str, str]]:
                 for file in files:
                     ext = Path(file).suffix.lower()
                     if ext in [".dll", ".vst3"]:
-                        plugins.append({
-                            "name": Path(file).stem,
-                            "format": fmt,
-                            "path": str(Path(root) / file)
-                        })
+                        plugins.append(
+                            {
+                                "name": Path(file).stem,
+                                "format": fmt,
+                                "path": str(Path(root) / file),
+                            }
+                        )
 
     return plugins
+
 
 def register(mcp: FastMCP) -> None:
     """Register VST scanner and loading tools with FastMCP."""
@@ -166,10 +178,7 @@ def register(mcp: FastMCP) -> None:
             str: JSON containing categorized generators/effects lists.
         """
         db = scan_plugin_database()
-        result = {
-            "plugin_database": db,
-            "system_plugins": []
-        }
+        result = {"plugin_database": db, "system_plugins": []}
         if scan_system:
             result["system_plugins"] = scan_system_plugins()
 
@@ -199,8 +208,6 @@ def register(mcp: FastMCP) -> None:
         """
         automation = get_automation()
         success = automation.load_plugin(name)
-        return format_result({
-            "success": success,
-            "action": "load_plugin",
-            "plugin_name": name
-        })
+        return format_result(
+            {"success": success, "action": "load_plugin", "plugin_name": name}
+        )

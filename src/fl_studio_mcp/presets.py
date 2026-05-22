@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from fl_studio_mcp.tools.vst_scanner import get_fl_user_data_path
 
+
 class PresetLibrarian:
     """Manages the VST presets catalog and GUI click coordinates in a local JSON database."""
 
@@ -50,7 +51,7 @@ class PresetLibrarian:
         y: int,
         category: str = "Unsorted",
         tags: Optional[List[str]] = None,
-        notes: str = ""
+        notes: str = "",
     ) -> Dict[str, Any]:
         """Save or update VST preset click coordinates and tags."""
         norm_vst = vst_name.strip()
@@ -64,13 +65,17 @@ class PresetLibrarian:
             "y": y,
             "category": category.strip(),
             "tags": tags_list,
-            "notes": notes.strip()
+            "notes": notes.strip(),
         }
 
         # Remove existing if exists to prevent duplicates
         self.data["presets"] = [
-            p for p in self.data["presets"]
-            if not (p["vst_name"].lower() == norm_vst.lower() and p["preset_name"].lower() == norm_preset.lower())
+            p
+            for p in self.data["presets"]
+            if not (
+                p["vst_name"].lower() == norm_vst.lower()
+                and p["preset_name"].lower() == norm_preset.lower()
+            )
         ]
 
         self.data["presets"].append(preset_entry)
@@ -82,7 +87,7 @@ class PresetLibrarian:
         query: Optional[str] = None,
         vst_name: Optional[str] = None,
         tag: Optional[str] = None,
-        category: Optional[str] = None
+        category: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Search registered VST presets matching filters."""
         results = []
@@ -95,23 +100,23 @@ class PresetLibrarian:
             # Filter by VST name (exact or substring)
             if vst_lower and vst_lower not in p["vst_name"].lower():
                 continue
-            
+
             # Filter by category
             if cat_lower and cat_lower != p["category"].lower():
                 continue
-            
+
             # Filter by specific tag
             if tag_lower and tag_lower not in p["tags"]:
                 continue
-            
+
             # Filter by keyword query across name, category, notes, and tags
             if q_lower:
                 match = (
-                    q_lower in p["preset_name"].lower() or
-                    q_lower in p["vst_name"].lower() or
-                    q_lower in p["category"].lower() or
-                    q_lower in p["notes"].lower() or
-                    any(q_lower in t for t in p["tags"])
+                    q_lower in p["preset_name"].lower()
+                    or q_lower in p["vst_name"].lower()
+                    or q_lower in p["category"].lower()
+                    or q_lower in p["notes"].lower()
+                    or any(q_lower in t for t in p["tags"])
                 )
                 if not match:
                     continue
@@ -124,7 +129,10 @@ class PresetLibrarian:
         norm_vst = vst_name.strip().lower()
         norm_preset = preset_name.strip().lower()
         for p in self.data["presets"]:
-            if p["vst_name"].lower() == norm_vst and p["preset_name"].lower() == norm_preset:
+            if (
+                p["vst_name"].lower() == norm_vst
+                and p["preset_name"].lower() == norm_preset
+            ):
                 return p
         return None
 
@@ -134,8 +142,12 @@ class PresetLibrarian:
         norm_preset = preset_name.strip().lower()
         original_count = len(self.data["presets"])
         self.data["presets"] = [
-            p for p in self.data["presets"]
-            if not (p["vst_name"].lower() == norm_vst and p["preset_name"].lower() == norm_preset)
+            p
+            for p in self.data["presets"]
+            if not (
+                p["vst_name"].lower() == norm_vst
+                and p["preset_name"].lower() == norm_preset
+            )
         ]
         success = len(self.data["presets"]) < original_count
         if success:

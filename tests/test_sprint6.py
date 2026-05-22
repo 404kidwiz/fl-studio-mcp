@@ -5,7 +5,6 @@ Includes music theory generator unit tests, composition tools tests, and modifie
 
 import json
 import pytest
-from fl_studio_mcp.bridge import FLStudioBridge
 from fl_studio_mcp.models import (
     InsertScaleInput,
     InsertArpeggioInput,
@@ -28,6 +27,7 @@ def parse(result: str) -> dict:
 def _tool(module_name: str, tool_name: str):
     """Import the tool module and return its registered function."""
     from mcp.server.fastmcp import FastMCP
+
     if module_name == "composition":
         from fl_studio_mcp.tools import composition as mod
     else:
@@ -40,6 +40,7 @@ def _tool(module_name: str, tool_name: str):
 # ---------------------------------------------------------------------------
 # 1. Music Theory & Modifier Unit Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSprint6Theory:
     def test_rhythm_to_ticks(self):
@@ -94,9 +95,13 @@ class TestSprint6Theory:
         # Swing = 0.5 -> 0.5 * 12 = 6 ticks shift -> 24 + 6 = 30
         notes = [
             {"pitch": 60, "velocity": 100, "start_tick": 0},  # Step 0 (no shift)
-            {"pitch": 62, "velocity": 100, "start_tick": 24}, # Step 1 (even step index in 16th steps, shifts)
-            {"pitch": 64, "velocity": 100, "start_tick": 48}, # Step 2 (no shift)
-            {"pitch": 66, "velocity": 100, "start_tick": 72}, # Step 3 (shifts)
+            {
+                "pitch": 62,
+                "velocity": 100,
+                "start_tick": 24,
+            },  # Step 1 (even step index in 16th steps, shifts)
+            {"pitch": 64, "velocity": 100, "start_tick": 48},  # Step 2 (no shift)
+            {"pitch": 66, "velocity": 100, "start_tick": 72},  # Step 3 (shifts)
         ]
         res = apply_composition_modifiers(notes, "none", swing=0.5)
         assert res[0]["start_tick"] == 0
@@ -109,19 +114,24 @@ class TestSprint6Theory:
 # 2. Composition MCP Tools Tests
 # ---------------------------------------------------------------------------
 
+
 class TestSprint6Tools:
     async def test_fl_insert_scale_dry_run(self, dry_bridge):
         fn = _tool("composition", "fl_insert_scale")
-        res = parse(await fn(InsertScaleInput(
-            root="C5",
-            scale="major",
-            octaves=1,
-            rhythm="quarter",
-            channel_index=2,
-            start_tick=0,
-            velocity_curve="crescendo",
-            swing=0.0,
-        )))
+        res = parse(
+            await fn(
+                InsertScaleInput(
+                    root="C5",
+                    scale="major",
+                    octaves=1,
+                    rhythm="quarter",
+                    channel_index=2,
+                    start_tick=0,
+                    velocity_curve="crescendo",
+                    swing=0.0,
+                )
+            )
+        )
 
         assert res["dry_run"] is True
         assert res["note_count"] == 8
@@ -133,18 +143,22 @@ class TestSprint6Tools:
 
     async def test_fl_insert_arpeggio_dry_run_chord(self, dry_bridge):
         fn = _tool("composition", "fl_insert_arpeggio")
-        res = parse(await fn(InsertArpeggioInput(
-            root="C5",
-            chord_type="major",
-            style="up",
-            rate="sixteenth",
-            octaves=1,
-            channel_index=0,
-            start_tick=0,
-            duration_beats=4.0,
-            velocity_curve="none",
-            swing=0.0,
-        )))
+        res = parse(
+            await fn(
+                InsertArpeggioInput(
+                    root="C5",
+                    chord_type="major",
+                    style="up",
+                    rate="sixteenth",
+                    octaves=1,
+                    channel_index=0,
+                    start_tick=0,
+                    duration_beats=4.0,
+                    velocity_curve="none",
+                    swing=0.0,
+                )
+            )
+        )
 
         # 4 beats * 96 PPQ = 384 ticks
         # sixteenth = 24 ticks -> 384 / 24 = 16 notes generated
@@ -158,17 +172,21 @@ class TestSprint6Tools:
 
     async def test_fl_insert_arpeggio_dry_run_list(self, dry_bridge):
         fn = _tool("composition", "fl_insert_arpeggio")
-        res = parse(await fn(InsertArpeggioInput(
-            root="C5, E5, G5, B5",
-            style="down",
-            rate="eighth",
-            octaves=2,
-            channel_index=1,
-            start_tick=0,
-            duration_beats=2.0,
-            velocity_curve="none",
-            swing=0.0,
-        )))
+        res = parse(
+            await fn(
+                InsertArpeggioInput(
+                    root="C5, E5, G5, B5",
+                    style="down",
+                    rate="eighth",
+                    octaves=2,
+                    channel_index=1,
+                    start_tick=0,
+                    duration_beats=2.0,
+                    velocity_curve="none",
+                    swing=0.0,
+                )
+            )
+        )
 
         # 2 beats * 96 PPQ = 192 ticks
         # eighth = 48 ticks -> 192 / 48 = 4 notes generated
@@ -184,13 +202,17 @@ class TestSprint6Tools:
     async def test_fl_insert_drum_pattern_dry_run(self, dry_bridge):
         fn = _tool("composition", "fl_insert_drum_pattern")
         mapping = '{"0": [1, 0, 0, 1], "1": [0, 1, 0, 0]}'
-        res = parse(await fn(InsertDrumPatternInput(
-            mapping=mapping,
-            rhythm="sixteenth",
-            start_tick=0,
-            velocity_curve="none",
-            swing=0.0,
-        )))
+        res = parse(
+            await fn(
+                InsertDrumPatternInput(
+                    mapping=mapping,
+                    rhythm="sixteenth",
+                    start_tick=0,
+                    velocity_curve="none",
+                    swing=0.0,
+                )
+            )
+        )
 
         assert res["dry_run"] is True
         # hits: 2 hits on channel 0, 1 hit on channel 1 -> 3 notes
@@ -205,10 +227,14 @@ class TestSprint6Tools:
 
     async def test_fl_insert_drum_pattern_invalid_mapping(self, dry_bridge):
         fn = _tool("composition", "fl_insert_drum_pattern")
-        res = parse(await fn(InsertDrumPatternInput(
-            mapping="{invalid_json}",
-            rhythm="sixteenth",
-        )))
+        res = parse(
+            await fn(
+                InsertDrumPatternInput(
+                    mapping="{invalid_json}",
+                    rhythm="sixteenth",
+                )
+            )
+        )
         assert "error" in res
         assert res["error"] == "INVALID_PARAMS"
 
@@ -216,6 +242,7 @@ class TestSprint6Tools:
 # ---------------------------------------------------------------------------
 # 3. Notes Modifiers Integration Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSprint6NotesModifiers:
     async def test_fl_insert_notes_with_swing_and_curve(self, dry_bridge):
@@ -225,11 +252,15 @@ class TestSprint6NotesModifiers:
             Note(pitch=62, start_tick=24),
             Note(pitch=64, start_tick=48),
         ]
-        res = parse(await fn(InsertNotesInput(
-            notes=notes,
-            velocity_curve="crescendo",
-            swing=1.0,  # 1.0 * 12 = 12 ticks shift on step 1 (24 ticks)
-        )))
+        res = parse(
+            await fn(
+                InsertNotesInput(
+                    notes=notes,
+                    velocity_curve="crescendo",
+                    swing=1.0,  # 1.0 * 12 = 12 ticks shift on step 1 (24 ticks)
+                )
+            )
+        )
 
         assert res["dry_run"] is True
         assert res["note_count"] == 3

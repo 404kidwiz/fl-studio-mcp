@@ -26,7 +26,6 @@ def _notes_to_dicts(notes) -> list[dict]:
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_insert_scale",
         annotations={
@@ -61,19 +60,22 @@ def register(mcp: FastMCP) -> None:
             rhythm_ticks = rhythm_to_ticks(params.rhythm)
         except ValueError as exc:
             from ..errors import ErrorCode
+
             return format_result(
                 FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
             )
 
         note_dicts = []
         for idx, pitch in enumerate(pitches):
-            note_dicts.append({
-                "pitch": pitch,
-                "velocity": 100,
-                "start_tick": params.start_tick + idx * rhythm_ticks,
-                "duration_ticks": rhythm_ticks,
-                "channel": params.channel_index,
-            })
+            note_dicts.append(
+                {
+                    "pitch": pitch,
+                    "velocity": 100,
+                    "start_tick": params.start_tick + idx * rhythm_ticks,
+                    "duration_ticks": rhythm_ticks,
+                    "channel": params.channel_index,
+                }
+            )
 
         # Apply modifiers
         note_dicts = apply_composition_modifiers(
@@ -81,7 +83,10 @@ def register(mcp: FastMCP) -> None:
         )
 
         max_chunk_size = 32
-        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+        note_chunks = [
+            note_dicts[i : i + max_chunk_size]
+            for i in range(0, len(note_dicts), max_chunk_size)
+        ]
 
         from ..protocol import CMD_NOTES
 
@@ -134,7 +139,7 @@ def register(mcp: FastMCP) -> None:
 
         try:
             rate_ticks = rhythm_to_ticks(params.rate)
-            
+
             # Resolve pitches
             if "," in params.root:
                 base_pitches = []
@@ -150,8 +155,10 @@ def register(mcp: FastMCP) -> None:
                     for bp in base_pitches:
                         pitches.append(bp + oct_idx * 12)
             else:
-                pitches = generate_chord_pitches(params.root, params.chord_type, params.octaves)
-            
+                pitches = generate_chord_pitches(
+                    params.root, params.chord_type, params.octaves
+                )
+
             if not pitches:
                 raise ValueError("No pitches resolved for arpeggiator.")
 
@@ -175,6 +182,7 @@ def register(mcp: FastMCP) -> None:
 
         except ValueError as exc:
             from ..errors import ErrorCode
+
             return format_result(
                 FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
             )
@@ -189,13 +197,15 @@ def register(mcp: FastMCP) -> None:
             else:
                 p = ordered[step_idx % len(ordered)]
 
-            note_dicts.append({
-                "pitch": p,
-                "velocity": 100,
-                "start_tick": params.start_tick + step_idx * rate_ticks,
-                "duration_ticks": rate_ticks,
-                "channel": params.channel_index,
-            })
+            note_dicts.append(
+                {
+                    "pitch": p,
+                    "velocity": 100,
+                    "start_tick": params.start_tick + step_idx * rate_ticks,
+                    "duration_ticks": rate_ticks,
+                    "channel": params.channel_index,
+                }
+            )
 
         # Apply modifiers
         note_dicts = apply_composition_modifiers(
@@ -203,7 +213,10 @@ def register(mcp: FastMCP) -> None:
         )
 
         max_chunk_size = 32
-        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+        note_chunks = [
+            note_dicts[i : i + max_chunk_size]
+            for i in range(0, len(note_dicts), max_chunk_size)
+        ]
 
         from ..protocol import CMD_NOTES
 
@@ -258,6 +271,7 @@ def register(mcp: FastMCP) -> None:
             step_ticks = rhythm_to_ticks(params.rhythm)
         except ValueError as exc:
             from ..errors import ErrorCode
+
             return format_result(
                 FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
             )
@@ -268,6 +282,7 @@ def register(mcp: FastMCP) -> None:
                 chan_idx = int(chan_str)
             except ValueError:
                 from ..errors import ErrorCode
+
                 return format_result(
                     FLMCPError(
                         ErrorCode.INVALID_PARAMS,
@@ -277,13 +292,15 @@ def register(mcp: FastMCP) -> None:
 
             for step_idx, hit in enumerate(sequence):
                 if hit:
-                    note_dicts.append({
-                        "pitch": 60,
-                        "velocity": 100,
-                        "start_tick": params.start_tick + step_idx * step_ticks,
-                        "duration_ticks": step_ticks,
-                        "channel": chan_idx,
-                    })
+                    note_dicts.append(
+                        {
+                            "pitch": 60,
+                            "velocity": 100,
+                            "start_tick": params.start_tick + step_idx * step_ticks,
+                            "duration_ticks": step_ticks,
+                            "channel": chan_idx,
+                        }
+                    )
 
         # Apply modifiers
         note_dicts = apply_composition_modifiers(
@@ -291,7 +308,10 @@ def register(mcp: FastMCP) -> None:
         )
 
         max_chunk_size = 32
-        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+        note_chunks = [
+            note_dicts[i : i + max_chunk_size]
+            for i in range(0, len(note_dicts), max_chunk_size)
+        ]
 
         from ..protocol import CMD_NOTES
 
@@ -310,3 +330,38 @@ def register(mcp: FastMCP) -> None:
         result["notes_preview"] = note_dicts[:8]
         result["chunks_sent"] = len(note_chunks)
         return format_result(result)
+
+    @mcp.tool(
+        name="fl_add_marker",
+        annotations={
+            "title": "Add Arrangement Marker",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        },
+    )
+    def fl_add_marker(name: str) -> str:
+        """Add an arrangement time marker at the current song position in FL Studio.
+
+        Args:
+            name: The name/label of the marker to add.
+
+        Returns:
+            str: JSON indicating success or failure.
+        """
+        try:
+            from ..protocol import CMD_ADD_MARKER
+            from ..bridge import send_command_sync
+            
+            safe = [ord(c) for c in name[:14] if ord(c) <= 127]
+            payload = [len(safe)] + safe
+            success = send_command_sync(CMD_ADD_MARKER, payload)
+            
+            return format_result({
+                "success": success, 
+                "action": "add_marker", 
+                "name": name
+            })
+        except Exception as exc:
+            return format_result({"error": str(exc)})

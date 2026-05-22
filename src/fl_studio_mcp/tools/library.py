@@ -7,6 +7,7 @@ from ..bridge import format_result
 from ..automation import get_automation
 from fl_studio_mcp.tools.vst_scanner import get_fl_user_data_path
 
+
 def scan_user_library(library_type: str = "all") -> Dict[str, List[Dict[str, Any]]]:
     """Scan FL Studio user folder directories for assets (scores, presets, templates, audio).
 
@@ -18,7 +19,7 @@ def scan_user_library(library_type: str = "all") -> Dict[str, List[Dict[str, Any
         Dict mapping asset categories to lists of file descriptions.
     """
     user_data_path = get_fl_user_data_path()
-    
+
     categories = {
         "scores": user_data_path / "Presets" / "Scores",
         "channels": user_data_path / "Presets" / "Channel presets",
@@ -49,15 +50,20 @@ def scan_user_library(library_type: str = "all") -> Dict[str, List[Dict[str, Any
                 except Exception:
                     size_bytes = 0
 
-                result[cat_name].append({
-                    "name": Path(file).stem,
-                    "file_name": file,
-                    "category": str(rel_path.parent) if rel_path.parent != Path(".") else "Root",
-                    "size_bytes": size_bytes,
-                    "path": str(full_path)
-                })
+                result[cat_name].append(
+                    {
+                        "name": Path(file).stem,
+                        "file_name": file,
+                        "category": str(rel_path.parent)
+                        if rel_path.parent != Path(".")
+                        else "Root",
+                        "size_bytes": size_bytes,
+                        "path": str(full_path),
+                    }
+                )
 
     return result
+
 
 def register(mcp: FastMCP) -> None:
     """Register FL Studio user library tools with FastMCP."""
@@ -110,8 +116,6 @@ def register(mcp: FastMCP) -> None:
         """
         automation = get_automation()
         success = automation.open_file(file_path)
-        return format_result({
-            "success": success,
-            "action": "load_file",
-            "file_path": file_path
-        })
+        return format_result(
+            {"success": success, "action": "load_file", "file_path": file_path}
+        )

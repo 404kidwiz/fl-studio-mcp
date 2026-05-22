@@ -2,6 +2,9 @@
 
 from mcp.server.fastmcp import FastMCP
 
+import sys
+import mido
+
 from ..bridge import FLStudioBridge, format_result
 from ..errors import ErrorCode, FLMCPError
 from ..models import GetStatusInput
@@ -10,6 +13,7 @@ from ..protocol import (
     decode_resp_status,
     encode_query_status,
 )
+from ..automation import get_automation
 
 _NO_LISTENER_HINT = (
     "No MIDI input port is listening. "
@@ -26,7 +30,6 @@ _TIMEOUT_HINT = (
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_get_status",
         annotations={
@@ -80,37 +83,45 @@ def register(mcp: FastMCP) -> None:
         bridge = FLStudioBridge.get()
 
         try:
-            response = await bridge.query(encode_query_status(), RESP_STATUS, params.timeout_ms)
+            response = await bridge.query(
+                encode_query_status(), RESP_STATUS, params.timeout_ms
+            )
         except FLMCPError as exc:
             return format_result(exc.to_dict())
 
         # Dry-run: bridge.query returns None; return a canned preview
         if bridge.dry_run:
-            return format_result({
-                "dry_run": True,
-                "playing": False,
-                "bpm": 120,
-                "pattern_index": 0,
-                "channel_count": 0,
-                "source": "dry_run_preview",
-            })
+            return format_result(
+                {
+                    "dry_run": True,
+                    "playing": False,
+                    "bpm": 120,
+                    "pattern_index": 0,
+                    "channel_count": 0,
+                    "source": "dry_run_preview",
+                }
+            )
 
         # No input listener
         if response is None and not bridge.listening:
-            return format_result({
-                "error": ErrorCode.NOT_CONNECTED.value,
-                "message": "No MIDI input listener active.",
-                "hint": _NO_LISTENER_HINT,
-            })
+            return format_result(
+                {
+                    "error": ErrorCode.NOT_CONNECTED.value,
+                    "message": "No MIDI input listener active.",
+                    "hint": _NO_LISTENER_HINT,
+                }
+            )
 
         # Timeout
         if response is None:
-            return format_result({
-                "error": "TIMEOUT",
-                "message": "FL Studio did not respond.",
-                "hint": _TIMEOUT_HINT,
-                "timeout_ms": params.timeout_ms,
-            })
+            return format_result(
+                {
+                    "error": "TIMEOUT",
+                    "message": "FL Studio did not respond.",
+                    "hint": _TIMEOUT_HINT,
+                    "timeout_ms": params.timeout_ms,
+                }
+            )
 
         try:
             status = decode_resp_status(response["payload"])
@@ -122,3 +133,61 @@ def register(mcp: FastMCP) -> None:
         status["listening"] = bridge.listening
         status["source"] = "fl_studio"
         return format_result(status)
+
+    @mcp.tool(
+        name="fl_health_check",
+        annotations={
+            "title": "System Health Check",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def fl_health_check() -> str:
+        """Run a full system diagnostic check for the FL Studio MCP environment.
+
+        Returns OS info, Python version, MIDI port availability, current connection status,
+        and whether the FL Studio window can be detected. Use this when troubleshooting
+        connection or automation issues.
+
+        Returns:
+            str: JSON diagnostic report.
+        """
+        bridge = FLStudioBridge.get()
+        automation = get_automation()
+
+        try:
+            inputs = mido.get_input_names()
+            outputs = mido.get_output_names()
+        except Exception as e:
+            inputs = [f"Error: {e}"]
+            outputs = [f"Error: {e}"]
+
+        try:
+            window_found = automation.focus_fl_studio()
+        except Exception:
+            window_found = False
+
+        report = {
+            "platform": sys.platform,
+            "python_version": sys.version.split()[0],
+            "mido_version": mido.__version__,
+            "bridge": {
+                "connected": bridge.connected,
+                "listening": bridge.listening,
+                "output_port": bridge.port_name,
+                "input_port": bridge._input_port.name if bridge._input_port else None,
+                "dry_run": bridge.dry_run,
+            },
+            "automation": {
+                "driver": automation.__class__.__name__,
+                "window_detected": window_found,
+            },
+            "system_midi": {
+                "inputs_available": inputs,
+                "outputs_available": outputs,
+            },
+        }
+
+        return format_result(report)

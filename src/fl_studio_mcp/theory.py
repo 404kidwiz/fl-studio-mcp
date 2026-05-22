@@ -1,6 +1,5 @@
 """Music theory structures and note generators for scales, chords, and arpeggios."""
 
-import re
 import random
 from typing import Dict, List, Union, Optional
 from fl_studio_mcp.models import note_name_to_pitch
@@ -44,6 +43,7 @@ RHYTHMS: Dict[str, int] = {
     "triplet_eighth": 32,
 }
 
+
 def rhythm_to_ticks(rhythm: str) -> int:
     """Parse a rhythm name string to its tick duration (based on 96 ticks per beat)."""
     norm = rhythm.strip().lower()
@@ -58,9 +58,12 @@ def rhythm_to_ticks(rhythm: str) -> int:
             f"{', '.join(RHYTHMS.keys())} or an integer tick count."
         )
 
-def generate_scale_notes(root: Union[int, str], scale_name: str, octaves: int = 1) -> List[int]:
+
+def generate_scale_notes(
+    root: Union[int, str], scale_name: str, octaves: int = 1
+) -> List[int]:
     """Generate a list of MIDI pitch integers for a scale starting at root.
-    
+
     Includes the resolution note of the final octave.
     """
     if isinstance(root, str):
@@ -85,7 +88,7 @@ def generate_scale_notes(root: Union[int, str], scale_name: str, octaves: int = 
             p = root_pitch + offset + interval
             if 0 <= p <= 127:
                 pitches.append(p)
-    
+
     # Complete scale resolution
     resolved_pitch = root_pitch + octaves * 12
     if 0 <= resolved_pitch <= 127:
@@ -93,7 +96,10 @@ def generate_scale_notes(root: Union[int, str], scale_name: str, octaves: int = 
 
     return pitches
 
-def generate_chord_pitches(root: Union[int, str], chord_type: str, octaves: int = 1) -> List[int]:
+
+def generate_chord_pitches(
+    root: Union[int, str], chord_type: str, octaves: int = 1
+) -> List[int]:
     """Generate a list of MIDI pitch integers for a chord starting at root."""
     if isinstance(root, str):
         root_pitch = note_name_to_pitch(root)
@@ -119,13 +125,17 @@ def generate_chord_pitches(root: Union[int, str], chord_type: str, octaves: int 
                 pitches.append(p)
     return pitches
 
-def apply_composition_modifiers(note_dicts: list[dict], velocity_curve: str, swing: float) -> list[dict]:
+
+def apply_composition_modifiers(
+    note_dicts: list[dict], velocity_curve: str, swing: float
+) -> list[dict]:
     """Apply velocity curves and swing quantization to list of note dicts.
-    
+
     velocity_curve can be: 'none', 'humanize', 'crescendo', 'decrescendo'.
     swing is a factor between 0.0 and 1.0 that shifts even subdivisions.
     """
     import random
+
     n = len(note_dicts)
     if n > 0:
         vel_mode = velocity_curve.strip().lower()
@@ -156,7 +166,9 @@ def apply_composition_modifiers(note_dicts: list[dict], velocity_curve: str, swi
                 note["start_tick"] += shift_ticks
 
     # 3. Sort chronologically by start_tick (with tie-breakers for stable order)
-    note_dicts.sort(key=lambda x: (x.get("start_tick", 0), x.get("channel", 0), x.get("pitch", 0)))
+    note_dicts.sort(
+        key=lambda x: (x.get("start_tick", 0), x.get("channel", 0), x.get("pitch", 0))
+    )
 
     return note_dicts
 
@@ -184,7 +196,7 @@ def generate_markov_melody(
     root: str,
     scale: str,
     length: int = 16,
-    start_pitch: Optional[Union[int, str]] = None
+    start_pitch: Optional[Union[int, str]] = None,
 ) -> List[int]:
     """Generate a sequence of MIDI pitches using a scale-constrained Markov chain."""
     # 1. Generate available scale pitches over 2 octaves
@@ -202,7 +214,9 @@ def generate_markov_melody(
         else:
             start_val = start_pitch
         # Find closest pitch in scale
-        curr_idx = min(range(len(scale_pitches)), key=lambda i: abs(scale_pitches[i] - start_val))
+        curr_idx = min(
+            range(len(scale_pitches)), key=lambda i: abs(scale_pitches[i] - start_val)
+        )
     else:
         curr_idx = 0  # Root note
 
@@ -272,4 +286,3 @@ def optimize_voice_leading(chords_pitches: List[List[int]]) -> List[List[int]]:
         optimized.append(sorted(new_chord))
 
     return optimized
-

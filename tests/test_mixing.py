@@ -7,7 +7,6 @@ import json
 
 import pytest
 
-from fl_studio_mcp.bridge import FLStudioBridge
 from fl_studio_mcp.models import MuteChannelInput, PanicInput, SoloChannelInput
 from fl_studio_mcp.protocol import (
     encode_mute_channel,
@@ -20,6 +19,7 @@ from fl_studio_mcp.protocol import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def parse(result: str) -> dict:
     return json.loads(result)
 
@@ -27,6 +27,7 @@ def parse(result: str) -> dict:
 def _tool(tool_name: str):
     import importlib
     from mcp.server.fastmcp import FastMCP
+
     mod = importlib.import_module("fl_studio_mcp.tools.mixing")
     _mcp = FastMCP("test")
     mod.register(_mcp)
@@ -36,6 +37,7 @@ def _tool(tool_name: str):
 # ---------------------------------------------------------------------------
 # Protocol: panic_messages
 # ---------------------------------------------------------------------------
+
 
 class TestPanicMessages:
     def test_returns_48_messages(self):
@@ -64,6 +66,7 @@ class TestPanicMessages:
 # ---------------------------------------------------------------------------
 # Protocol: encode_mute_channel / encode_solo_channel
 # ---------------------------------------------------------------------------
+
 
 class TestMixingProtocol:
     def test_mute_channel_cmd(self):
@@ -105,6 +108,7 @@ class TestMixingProtocol:
 # Tool: fl_panic
 # ---------------------------------------------------------------------------
 
+
 class TestFlPanic:
     async def test_dry_run(self, dry_bridge):
         fn = _tool("fl_panic")
@@ -133,6 +137,7 @@ class TestFlPanic:
 # ---------------------------------------------------------------------------
 # Tool: fl_mute_channel
 # ---------------------------------------------------------------------------
+
 
 class TestFlMuteChannel:
     async def test_dry_run_mute(self, dry_bridge):
@@ -174,6 +179,7 @@ class TestFlMuteChannel:
 # ---------------------------------------------------------------------------
 # Tool: fl_solo_channel
 # ---------------------------------------------------------------------------
+
 
 class TestFlSoloChannel:
     async def test_dry_run_solo(self, dry_bridge):

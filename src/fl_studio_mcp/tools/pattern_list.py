@@ -22,7 +22,6 @@ _TIMEOUT_HINT = (
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_list_patterns",
         annotations={
@@ -58,19 +57,42 @@ def register(mcp: FastMCP) -> None:
         bridge = FLStudioBridge.get()
 
         try:
-            response = await bridge.query(encode_query_patterns(), RESP_PATTERNS, params.timeout_ms)
+            response = await bridge.query(
+                encode_query_patterns(), RESP_PATTERNS, params.timeout_ms
+            )
         except FLMCPError as exc:
             return format_result(exc.to_dict())
 
         if bridge.dry_run:
             mock = ["Pattern 1", "Verse", "Chorus", "Bridge", "Outro"]
-            return format_result({"dry_run": True, "patterns": mock, "count": len(mock), "source": "dry_run_preview"})
+            return format_result(
+                {
+                    "dry_run": True,
+                    "patterns": mock,
+                    "count": len(mock),
+                    "source": "dry_run_preview",
+                }
+            )
 
         if response is None and not bridge.listening:
-            return format_result({"error": ErrorCode.NOT_CONNECTED.value, "hint": _NO_LISTENER_HINT})
+            return format_result(
+                {"error": ErrorCode.NOT_CONNECTED.value, "hint": _NO_LISTENER_HINT}
+            )
 
         if response is None:
-            return format_result({"error": "TIMEOUT", "hint": _TIMEOUT_HINT, "timeout_ms": params.timeout_ms})
+            return format_result(
+                {
+                    "error": "TIMEOUT",
+                    "hint": _TIMEOUT_HINT,
+                    "timeout_ms": params.timeout_ms,
+                }
+            )
 
         pattern_names = decode_resp_patterns(response["payload"])
-        return format_result({"patterns": pattern_names, "count": len(pattern_names), "source": "fl_studio"})
+        return format_result(
+            {
+                "patterns": pattern_names,
+                "count": len(pattern_names),
+                "source": "fl_studio",
+            }
+        )

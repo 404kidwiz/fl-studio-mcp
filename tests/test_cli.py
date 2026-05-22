@@ -96,7 +96,9 @@ def test_cli_commands_in_dry_run(mock_home):
     assert vol_data["volume"] == 90
 
     # Test chord command
-    result = runner.invoke(main, ["chord", "C4", "minor", "--start", "96", "--duration", "192"])
+    result = runner.invoke(
+        main, ["chord", "C4", "minor", "--start", "96", "--duration", "192"]
+    )
     assert result.exit_code == 0
     chord_data = json.loads(result.output)
     assert chord_data["dry_run"] is True
@@ -124,19 +126,46 @@ def test_cli_composition_dry_run(mock_home):
     runner.invoke(main, ["connect", "--port", "Test Port", "--dry-run"])
 
     # Test scale command
-    result = runner.invoke(main, ["composition", "scale", "--root", "C5", "--scale", "minor", "--octaves", "1"])
+    result = runner.invoke(
+        main,
+        ["composition", "scale", "--root", "C5", "--scale", "minor", "--octaves", "1"],
+    )
     assert result.exit_code == 0
     scale_data = json.loads(result.output)
     assert scale_data["dry_run"] is True
 
     # Test arpeggio command
-    result = runner.invoke(main, ["composition", "arpeggio", "--root", "C5", "--chord", "major", "--style", "up", "--octaves", "1"])
+    result = runner.invoke(
+        main,
+        [
+            "composition",
+            "arpeggio",
+            "--root",
+            "C5",
+            "--chord",
+            "major",
+            "--style",
+            "up",
+            "--octaves",
+            "1",
+        ],
+    )
     assert result.exit_code == 0
     arp_data = json.loads(result.output)
     assert arp_data["dry_run"] is True
 
     # Test drums command
-    result = runner.invoke(main, ["composition", "drums", "--mapping", '{"0": [1, 0, 0, 1]}', "--rhythm", "eighth"])
+    result = runner.invoke(
+        main,
+        [
+            "composition",
+            "drums",
+            "--mapping",
+            '{"0": [1, 0, 0, 1]}',
+            "--rhythm",
+            "eighth",
+        ],
+    )
     assert result.exit_code == 0
     drums_data = json.loads(result.output)
     assert drums_data["dry_run"] is True
@@ -145,15 +174,15 @@ def test_cli_composition_dry_run(mock_home):
 def test_cli_link_script(tmp_path):
     """Verify link-script command creates target directory and copies scripts."""
     runner = CliRunner()
-    
+
     # We can pass an explicit destination
     dest_dir = tmp_path / "FL_Studio" / "Settings" / "Hardware"
     result = runner.invoke(main, ["link-script", "--dest", str(dest_dir)])
-    
+
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["status"] == "success"
-    
+
     # Check target files were copied
     copied_dir = dest_dir / "FL Studio MCP Bridge"
     assert copied_dir.exists()
@@ -164,20 +193,20 @@ def test_cli_link_script(tmp_path):
 def test_cli_install_config(tmp_path):
     """Verify install-config writes servers to claude config."""
     runner = CliRunner()
-    
+
     config_file = tmp_path / "claude_desktop_config.json"
-    
-    result = runner.invoke(main, ["install-config", "--claude-config", str(config_file)])
+
+    result = runner.invoke(
+        main, ["install-config", "--claude-config", str(config_file)]
+    )
     assert result.exit_code == 0
     data = json.loads(result.output)
     assert data["status"] == "success"
-    
+
     # Verify file content
     assert config_file.exists()
     with open(config_file, "r") as f:
         config_data = json.load(f)
-        
+
     assert "fl-studio-mcp" in config_data["mcpServers"]
     assert config_data["mcpServers"]["fl-studio-mcp"]["command"] == "uv"
-
-

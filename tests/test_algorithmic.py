@@ -1,9 +1,7 @@
 import json
 import pytest
-from unittest.mock import patch
 from mcp.server.fastmcp import FastMCP
 
-from fl_studio_mcp.bridge import FLStudioBridge
 from fl_studio_mcp.models import (
     InsertEuclideanDrumsInput,
     GenerateMarkovMelodyInput,
@@ -14,7 +12,10 @@ from fl_studio_mcp.theory import (
     generate_markov_melody,
     optimize_voice_leading,
 )
-from fl_studio_mcp.tools.algorithmic import register as register_algorithmic, parse_chord_string
+from fl_studio_mcp.tools.algorithmic import (
+    register as register_algorithmic,
+    parse_chord_string,
+)
 
 
 def parse(result: str) -> dict:
@@ -35,6 +36,7 @@ def _tool(tool_name: str):
 # ===========================================================================
 # Math & Logic Unit Tests
 # ===========================================================================
+
 
 def test_euclidean_rhythm_distribution():
     # 4 hits in 8 steps -> [1, 0, 1, 0, 1, 0, 1, 0]
@@ -97,10 +99,11 @@ def test_parse_chord_string():
 # FastMCP Tool Integration Tests (Dry-Run Mode)
 # ===========================================================================
 
+
 @pytest.mark.asyncio
 async def test_fl_insert_euclidean_drums_tool(dry_bridge):
     fn = _tool("fl_insert_euclidean_drums")
-    
+
     # 1. Standard pitch mapping
     params = InsertEuclideanDrumsInput(
         mapping='{"0": "C3", "1": 38}',

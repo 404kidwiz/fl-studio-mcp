@@ -9,6 +9,15 @@ commands to FL Studio via MIDI using the IAC Driver on macOS.
 """
 
 import os
+import logging
+
+# Configure logging based on FL_MCP_LOG_LEVEL
+log_level_name = os.getenv("FL_MCP_LOG_LEVEL", "WARNING").upper()
+log_level = getattr(logging, log_level_name, logging.WARNING)
+logging.basicConfig(
+    level=log_level,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 from mcp.server.fastmcp import FastMCP
 
@@ -31,6 +40,14 @@ from .tools import (
     gui_automation,
     presets,
     algorithmic,
+    plugins,
+    ui,
+    project_generator,
+    dsp,
+    vision,
+    stems,
+    midi_gen,
+    collaboration,
 )
 
 from . import resources, prompts
@@ -47,7 +64,7 @@ mcp = FastMCP(
         "Exposes filesystem/system plugins scanning via fl_list_installed_plugins/fl_list_library "
         "and VST/file loading via fl_load_plugin/fl_load_file using GUI automation. "
         "Use fl_panic any time notes get stuck. "
-        "Note pitch accepts integers (60) or note names (\"C4\", \"F#3\", \"Bb4\"). "
+        'Note pitch accepts integers (60) or note names ("C4", "F#3", "Bb4"). '
         "fl_insert_notes plays notes in realtime — to record into a pattern, "
         "enable Record mode in FL Studio's transport first, then insert notes. "
         "fl_save_project saves to the current filename (Ctrl+S equivalent). "
@@ -74,11 +91,18 @@ composition.register(mcp)
 gui_automation.register(mcp)
 presets.register(mcp)
 algorithmic.register(mcp)
+plugins.register(mcp)
+ui.register(mcp)
+project_generator.register(mcp)
+dsp.register(mcp)
+vision.register(mcp)
+stems.register(mcp)
+midi_gen.register(mcp)
+collaboration.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)
 prompts.register(mcp)
-
 
 
 def main() -> None:
@@ -86,7 +110,11 @@ def main() -> None:
     dry_run = os.getenv("FL_MCP_DRY_RUN", "0") == "1"
     if dry_run:
         import sys
-        print("FL Studio MCP starting in DRY-RUN mode (no MIDI will be sent)", file=sys.stderr)
+
+        print(
+            "FL Studio MCP starting in DRY-RUN mode (no MIDI will be sent)",
+            file=sys.stderr,
+        )
     mcp.run()
 
 

@@ -15,6 +15,7 @@ from .protocol import (
     encode_get_notes,
 )
 
+
 def register(mcp: FastMCP) -> None:
     """Register all live FL Studio resources on the FastMCP instance."""
 
@@ -27,29 +28,25 @@ def register(mcp: FastMCP) -> None:
         """
         bridge = FLStudioBridge.get()
         if bridge.dry_run:
-            return json.dumps({
-                "bpm": 120,
-                "source": "dry_run_preview"
-            }, indent=2)
+            return json.dumps({"bpm": 120, "source": "dry_run_preview"}, indent=2)
 
         try:
-            response = await bridge.query(encode_query_status(), RESP_STATUS, timeout_ms=2000)
+            response = await bridge.query(
+                encode_query_status(), RESP_STATUS, timeout_ms=2000
+            )
             if response is None:
-                return json.dumps({
-                    "error": "TIMEOUT",
-                    "hint": "FL Studio did not respond to status query"
-                }, indent=2)
-            
+                return json.dumps(
+                    {
+                        "error": "TIMEOUT",
+                        "hint": "FL Studio did not respond to status query",
+                    },
+                    indent=2,
+                )
+
             status = decode_resp_status(response["payload"])
-            return json.dumps({
-                "bpm": status["bpm"],
-                "source": "fl_studio"
-            }, indent=2)
+            return json.dumps({"bpm": status["bpm"], "source": "fl_studio"}, indent=2)
         except Exception as e:
-            return json.dumps({
-                "error": "ERROR",
-                "message": str(e)
-            }, indent=2)
+            return json.dumps({"error": "ERROR", "message": str(e)}, indent=2)
 
     @mcp.resource("fl://channels")
     async def get_channels() -> str:
@@ -61,31 +58,31 @@ def register(mcp: FastMCP) -> None:
         bridge = FLStudioBridge.get()
         if bridge.dry_run:
             mock = ["Kick", "Snare", "Hi-Hat", "Bass", "Synth Lead"]
-            return json.dumps({
-                "channels": mock,
-                "count": len(mock),
-                "source": "dry_run_preview"
-            }, indent=2)
+            return json.dumps(
+                {"channels": mock, "count": len(mock), "source": "dry_run_preview"},
+                indent=2,
+            )
 
         try:
-            response = await bridge.query(encode_query_channels(), RESP_CHANNELS, timeout_ms=2000)
+            response = await bridge.query(
+                encode_query_channels(), RESP_CHANNELS, timeout_ms=2000
+            )
             if response is None:
-                return json.dumps({
-                    "error": "TIMEOUT",
-                    "hint": "FL Studio did not respond to channel query"
-                }, indent=2)
-            
+                return json.dumps(
+                    {
+                        "error": "TIMEOUT",
+                        "hint": "FL Studio did not respond to channel query",
+                    },
+                    indent=2,
+                )
+
             channels = decode_resp_channels(response["payload"])
-            return json.dumps({
-                "channels": channels,
-                "count": len(channels),
-                "source": "fl_studio"
-            }, indent=2)
+            return json.dumps(
+                {"channels": channels, "count": len(channels), "source": "fl_studio"},
+                indent=2,
+            )
         except Exception as e:
-            return json.dumps({
-                "error": "ERROR",
-                "message": str(e)
-            }, indent=2)
+            return json.dumps({"error": "ERROR", "message": str(e)}, indent=2)
 
     @mcp.resource("fl://pattern/notes")
     async def get_pattern_notes() -> str:
@@ -97,35 +94,52 @@ def register(mcp: FastMCP) -> None:
         bridge = FLStudioBridge.get()
         if bridge.dry_run:
             mock = [
-                {"pitch": 60, "velocity": 100, "channel": 0, "start_tick": 0, "duration_ticks": 96},
-                {"pitch": 64, "velocity": 100, "channel": 0, "start_tick": 96, "duration_ticks": 96},
-                {"pitch": 67, "velocity": 100, "channel": 0, "start_tick": 192, "duration_ticks": 192},
+                {
+                    "pitch": 60,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 0,
+                    "duration_ticks": 96,
+                },
+                {
+                    "pitch": 64,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 96,
+                    "duration_ticks": 96,
+                },
+                {
+                    "pitch": 67,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 192,
+                    "duration_ticks": 192,
+                },
             ]
-            return json.dumps({
-                "notes": mock,
-                "count": len(mock),
-                "source": "dry_run_preview"
-            }, indent=2)
+            return json.dumps(
+                {"notes": mock, "count": len(mock), "source": "dry_run_preview"},
+                indent=2,
+            )
 
         try:
-            response = await bridge.query(encode_get_notes(), RESP_NOTES, timeout_ms=2000)
+            response = await bridge.query(
+                encode_get_notes(), RESP_NOTES, timeout_ms=2000
+            )
             if response is None:
-                return json.dumps({
-                    "error": "TIMEOUT",
-                    "hint": "FL Studio did not respond to notes query"
-                }, indent=2)
-            
+                return json.dumps(
+                    {
+                        "error": "TIMEOUT",
+                        "hint": "FL Studio did not respond to notes query",
+                    },
+                    indent=2,
+                )
+
             notes = decode_resp_notes(response["payload"])
-            return json.dumps({
-                "notes": notes,
-                "count": len(notes),
-                "source": "fl_studio"
-            }, indent=2)
+            return json.dumps(
+                {"notes": notes, "count": len(notes), "source": "fl_studio"}, indent=2
+            )
         except Exception as e:
-            return json.dumps({
-                "error": "ERROR",
-                "message": str(e)
-            }, indent=2)
+            return json.dumps({"error": "ERROR", "message": str(e)}, indent=2)
 
     @mcp.resource("fl://pattern/notes/visual")
     async def get_pattern_notes_visual() -> str:
@@ -139,13 +153,33 @@ def register(mcp: FastMCP) -> None:
 
         if bridge.dry_run:
             notes = [
-                {"pitch": 67, "velocity": 100, "channel": 0, "start_tick": 192, "duration_ticks": 192},
-                {"pitch": 64, "velocity": 100, "channel": 0, "start_tick": 96, "duration_ticks": 96},
-                {"pitch": 60, "velocity": 100, "channel": 0, "start_tick": 0, "duration_ticks": 96},
+                {
+                    "pitch": 67,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 192,
+                    "duration_ticks": 192,
+                },
+                {
+                    "pitch": 64,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 96,
+                    "duration_ticks": 96,
+                },
+                {
+                    "pitch": 60,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 0,
+                    "duration_ticks": 96,
+                },
             ]
         else:
             try:
-                response = await bridge.query(encode_get_notes(), RESP_NOTES, timeout_ms=2000)
+                response = await bridge.query(
+                    encode_get_notes(), RESP_NOTES, timeout_ms=2000
+                )
                 if response is not None:
                     notes = decode_resp_notes(response["payload"])
             except Exception as e:
@@ -204,21 +238,21 @@ def register(mcp: FastMCP) -> None:
             step_line += f"{s_num} "
 
         # Crop matching lengths
-        beat_line = beat_line[:len(step_line)].rstrip()
+        beat_line = beat_line[: len(step_line)].rstrip()
         lines.append(beat_line)
         lines.append(step_line)
         lines.append("-" * len(step_line))
 
         # Rows
         for p in range(max_p, min_p - 1, -1):
-            row_indicator = "█" if p in pitches else " "
             row_header = f"{pitch_to_name(p):<5} | "
             row_content = " ".join(grid[p])
             lines.append(f"{row_header}{row_content}")
 
         lines.append("```")
         lines.append("")
-        lines.append("> **Legend**: `█` = Played Note duration | `░` = Empty grid timeline subdivision (sixteenth notes)")
+        lines.append(
+            "> **Legend**: `█` = Played Note duration | `░` = Empty grid timeline subdivision (sixteenth notes)"
+        )
 
         return "\n".join(lines)
-

@@ -6,11 +6,13 @@ from mcp.server.fastmcp import FastMCP
 
 from fl_studio_mcp.presets import PresetLibrarian
 from fl_studio_mcp.models import CatalogPresetInput, SearchPresetsInput, LoadPresetInput
-from fl_studio_mcp.tools.presets import register as register_presets, get_librarian
+from fl_studio_mcp.tools.presets import register as register_presets
+
 
 @pytest.fixture
 def temp_db_path(tmp_path):
     return tmp_path / "test_presets.json"
+
 
 def test_preset_librarian_basic_crud(temp_db_path):
     """Test PresetLibrarian's core catalog, search, and delete features."""
@@ -24,7 +26,7 @@ def test_preset_librarian_basic_crud(temp_db_path):
         y=200,
         category="Pads",
         tags=["warm", "cinematic"],
-        notes="A warm ambient pad sound."
+        notes="A warm ambient pad sound.",
     )
     assert entry["vst_name"] == "Serum"
     assert entry["preset_name"] == "Ambient Pad"
@@ -49,7 +51,7 @@ def test_preset_librarian_basic_crud(temp_db_path):
         x=150,
         y=250,
         category="Pads",
-        tags=["warm", "cinematic", "chill"]
+        tags=["warm", "cinematic", "chill"],
     )
     fetched_updated = lib.get_preset("Serum", "Ambient Pad")
     assert fetched_updated["x"] == 150
@@ -66,7 +68,7 @@ def test_preset_librarian_basic_crud(temp_db_path):
         y=400,
         category="Basses",
         tags=["heavy", "sub"],
-        notes="A deep sub bass sound."
+        notes="A deep sub bass sound.",
     )
 
     # 5. Search presets
@@ -94,11 +96,16 @@ def test_preset_librarian_basic_crud(temp_db_path):
     assert lib.get_preset("Serum", "Ambient Pad") is None
     assert len(lib.data["presets"]) == 1
 
+
 def test_preset_librarian_fallback_path():
     """Test that PresetLibrarian falls back correctly to local path when exception occurs."""
-    with patch("fl_studio_mcp.presets.get_fl_user_data_path", side_effect=RuntimeError("No FL Studio found")):
+    with patch(
+        "fl_studio_mcp.presets.get_fl_user_data_path",
+        side_effect=RuntimeError("No FL Studio found"),
+    ):
         lib = PresetLibrarian()
         assert lib.db_path == Path(".fl_studio_mcp") / "mcp_presets.json"
+
 
 @pytest.mark.asyncio
 async def test_preset_tools(temp_db_path):
@@ -123,7 +130,7 @@ async def test_preset_tools(temp_db_path):
             y=600,
             category="Plucks",
             tags=["dry", "pluck"],
-            notes="A dry pluck sound."
+            notes="A dry pluck sound.",
         )
         res_cat = await catalog_tool.fn(catalog_input)
         res_cat_data = json.loads(res_cat)
@@ -146,7 +153,9 @@ async def test_preset_tools(temp_db_path):
         # Mock the automation click_at call
         mock_auto = MagicMock()
         mock_auto.click_at.return_value = True
-        with patch("fl_studio_mcp.tools.presets.get_automation", return_value=mock_auto):
+        with patch(
+            "fl_studio_mcp.tools.presets.get_automation", return_value=mock_auto
+        ):
             res_load = await load_tool.fn(load_input)
             res_load_data = json.loads(res_load)
             assert res_load_data["success"] is True
@@ -154,7 +163,9 @@ async def test_preset_tools(temp_db_path):
             mock_auto.click_at.assert_called_once_with(500, 600)
 
         # Test loading non-existent preset
-        load_missing_input = LoadPresetInput(vst_name="Sylenth1", preset_name="Missing Sound")
+        load_missing_input = LoadPresetInput(
+            vst_name="Sylenth1", preset_name="Missing Sound"
+        )
         res_load_missing = await load_tool.fn(load_missing_input)
         res_load_missing_data = json.loads(res_load_missing)
         assert "error" in res_load_missing_data

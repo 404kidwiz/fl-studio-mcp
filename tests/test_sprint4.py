@@ -3,7 +3,6 @@
 Includes protocol tests, MCP tool behaviors, and Click CLI commands.
 """
 
-import asyncio
 import json
 import pytest
 import unittest.mock
@@ -32,6 +31,7 @@ from fl_studio_mcp.protocol import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def parse(result: str) -> dict:
     return json.loads(result)
 
@@ -45,6 +45,7 @@ def _tool(tool_name: str):
     """Import the mixing tool module and return its registered function."""
     from mcp.server.fastmcp import FastMCP
     from fl_studio_mcp.tools import mixing
+
     _mcp = FastMCP("test")
     mixing.register(_mcp)
     return {t.name: t for t in _mcp._tool_manager.list_tools()}[tool_name].fn
@@ -61,6 +62,7 @@ def mock_home(tmp_path, monkeypatch):
 # 1. Protocol Tests
 # ---------------------------------------------------------------------------
 
+
 class TestSprint4Protocol:
     def test_encode_set_mixer_vol(self):
         # Track 5, Volume 100
@@ -68,8 +70,8 @@ class TestSprint4Protocol:
         assert raw[0] == 0xF0
         assert raw[1] == 0x7D
         assert raw[2] == 0x19  # CMD_SET_MIXER_VOL
-        assert raw[3] == 5     # track_idx
-        assert raw[4] == 100   # volume
+        assert raw[3] == 5  # track_idx
+        assert raw[4] == 100  # volume
         assert raw[-1] == 0xF7
 
     def test_encode_set_mixer_vol_bounds(self):
@@ -88,7 +90,7 @@ class TestSprint4Protocol:
         assert raw[2] == 0x1A  # CMD_SET_MIXER_PAN
         assert raw[3] == 10
         assert raw[4] == 64
-        
+
     def test_encode_set_mixer_pan_bounds(self):
         with pytest.raises(ValueError):
             encode_set_mixer_pan(-1, 64)
@@ -145,7 +147,7 @@ class TestSprint4Protocol:
         cmd, payload = decode_sysex(raw)
         assert cmd == RESP_MIXER_STATE
         decoded = decode_resp_mixer_state(payload)
-        
+
         assert decoded["start_track"] == 0
         assert decoded["end_track"] == 2
         assert len(decoded["tracks"]) == 3
@@ -157,6 +159,7 @@ class TestSprint4Protocol:
 # ---------------------------------------------------------------------------
 # 2. MCP Tool Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSprint4Tools:
     async def test_fl_set_mixer_volume_dry_run(self, dry_bridge):
@@ -213,10 +216,13 @@ class TestSprint4Tools:
             cmd, _ = decode_sysex(msg.bytes())
             if cmd == 0x1C:  # CMD_QUERY_MIXER_STATE
                 _inject_response(dry_bridge, RESP_MIXER_STATE, payload)
+
         dry_bridge._output_port.send = mock_send
 
         fn = _tool("fl_get_mixer_state")
-        result = parse(await fn(GetMixerStateInput(start_track=0, end_track=1, timeout_ms=500)))
+        result = parse(
+            await fn(GetMixerStateInput(start_track=0, end_track=1, timeout_ms=500))
+        )
         assert result["source"] == "fl_studio"
         assert result["start_track"] == 0
         assert result["end_track"] == 1
@@ -235,7 +241,9 @@ class TestSprint4Tools:
         dry_bridge._output_port = unittest.mock.Mock()
 
         fn = _tool("fl_get_mixer_state")
-        result = parse(await fn(GetMixerStateInput(start_track=0, end_track=2, timeout_ms=100)))
+        result = parse(
+            await fn(GetMixerStateInput(start_track=0, end_track=2, timeout_ms=100))
+        )
         assert result["error"] == "TIMEOUT"
 
         # Restore
@@ -247,6 +255,7 @@ class TestSprint4Tools:
 # ---------------------------------------------------------------------------
 # 3. CLI Command Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSprint4CLI:
     def test_cli_mixer_volume_dry_run(self, mock_home):

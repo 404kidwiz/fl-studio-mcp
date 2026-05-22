@@ -17,7 +17,6 @@ def _notes_to_dicts(notes) -> list[dict]:
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_insert_notes",
         annotations={
@@ -72,13 +71,17 @@ def register(mcp: FastMCP) -> None:
 
         # Apply composition modifiers (velocity curves and swing)
         from ..theory import apply_composition_modifiers
+
         note_dicts = apply_composition_modifiers(
             note_dicts, params.velocity_curve, params.swing
         )
 
         # Chunk notes list into batches of max 32 notes
         max_chunk_size = 32
-        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+        note_chunks = [
+            note_dicts[i : i + max_chunk_size]
+            for i in range(0, len(note_dicts), max_chunk_size)
+        ]
 
         from ..protocol import CMD_NOTES
 
@@ -93,6 +96,7 @@ def register(mcp: FastMCP) -> None:
             return format_result(exc.to_dict())
         except ValueError as exc:
             from ..errors import ErrorCode
+
             return format_result(
                 FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
             )
@@ -182,6 +186,7 @@ def register(mcp: FastMCP) -> None:
 
         if not all_notes:
             from ..errors import ErrorCode
+
             return format_result(
                 FLMCPError(
                     ErrorCode.INVALID_PARAMS,
@@ -191,7 +196,10 @@ def register(mcp: FastMCP) -> None:
 
         note_dicts = _notes_to_dicts(all_notes)
         max_chunk_size = 32
-        note_chunks = [note_dicts[i : i + max_chunk_size] for i in range(0, len(note_dicts), max_chunk_size)]
+        note_chunks = [
+            note_dicts[i : i + max_chunk_size]
+            for i in range(0, len(note_dicts), max_chunk_size)
+        ]
 
         from ..protocol import CMD_NOTES
 
@@ -206,6 +214,7 @@ def register(mcp: FastMCP) -> None:
             return format_result(exc.to_dict())
         except ValueError as exc:
             from ..errors import ErrorCode
+
             return format_result(
                 FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
             )
@@ -216,4 +225,3 @@ def register(mcp: FastMCP) -> None:
         result["progression_preview"] = progression_preview
         result["chunks_sent"] = len(note_chunks)
         return format_result(result)
-

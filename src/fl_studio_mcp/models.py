@@ -15,21 +15,29 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Semitone offset from C for each note letter
 _NOTE_SEMITONES: dict[str, int] = {
-    "C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11,
+    "C": 0,
+    "D": 2,
+    "E": 4,
+    "F": 5,
+    "G": 7,
+    "A": 9,
+    "B": 11,
 }
 
 # Accidental adjustments
 _ACCIDENTALS: dict[str, int] = {
-    "#": 1, "S": 1,          # sharp  (S = legacy "s" shorthand)
-    "B": -1, "F": -1,        # flat   (B = b, F = legacy "f" shorthand)
-    "X": 2,                  # double sharp
-    "BB": -2,                # double flat
+    "#": 1,
+    "S": 1,  # sharp  (S = legacy "s" shorthand)
+    "B": -1,
+    "F": -1,  # flat   (B = b, F = legacy "f" shorthand)
+    "X": 2,  # double sharp
+    "BB": -2,  # double flat
 }
 
 _NOTE_RE = re.compile(
-    r"^([A-Ga-g])"           # note letter
-    r"(#{1,2}|b{1,2}|x|bb)?" # optional accidental
-    r"(-?\d+)$",             # octave (may be negative, e.g. C-1 = MIDI 0)
+    r"^([A-Ga-g])"  # note letter
+    r"(#{1,2}|b{1,2}|x|bb)?"  # optional accidental
+    r"(-?\d+)$",  # octave (may be negative, e.g. C-1 = MIDI 0)
     re.IGNORECASE,
 )
 
@@ -75,6 +83,7 @@ def note_name_to_pitch(name: str) -> int:
 # Note model
 # ---------------------------------------------------------------------------
 
+
 class Note(BaseModel):
     """A single MIDI note with position and duration expressed in ticks.
 
@@ -94,10 +103,24 @@ class Note(BaseModel):
 
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
-    pitch: Annotated[int, Field(ge=0, le=127, description='MIDI pitch 0-127 OR note name string e.g. "C4", "F#3", "Bb4"')]
-    velocity: Annotated[int, Field(ge=1, le=127, description="Note velocity 1-127")] = 100
-    start_tick: Annotated[int, Field(ge=0, description="Start position in ticks (96 ticks = 1 quarter note)")] = 0
-    duration_ticks: Annotated[int, Field(ge=1, description="Duration in ticks (96 = quarter note)")] = 96
+    pitch: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=127,
+            description='MIDI pitch 0-127 OR note name string e.g. "C4", "F#3", "Bb4"',
+        ),
+    ]
+    velocity: Annotated[int, Field(ge=1, le=127, description="Note velocity 1-127")] = (
+        100
+    )
+    start_tick: Annotated[
+        int,
+        Field(ge=0, description="Start position in ticks (96 ticks = 1 quarter note)"),
+    ] = 0
+    duration_ticks: Annotated[
+        int, Field(ge=1, description="Duration in ticks (96 = quarter note)")
+    ] = 96
     channel: Annotated[int, Field(ge=0, le=15, description="MIDI channel 0-15")] = 0
 
     @field_validator("pitch", mode="before")
@@ -111,7 +134,9 @@ class Note(BaseModel):
             return note_name_to_pitch(v)
         return int(v)
 
-    @field_validator("velocity", "start_tick", "duration_ticks", "channel", mode="before")
+    @field_validator(
+        "velocity", "start_tick", "duration_ticks", "channel", mode="before"
+    )
     @classmethod
     def coerce_int(cls, v: object) -> int:
         return int(v)  # accept float-like inputs gracefully
@@ -120,6 +145,7 @@ class Note(BaseModel):
 # ---------------------------------------------------------------------------
 # Chord helpers
 # ---------------------------------------------------------------------------
+
 
 class ChordQuality(str, Enum):
     MAJOR = "major"
@@ -137,13 +163,13 @@ class ChordQuality(str, Enum):
 CHORD_INTERVALS: dict[ChordQuality, list[int]] = {
     ChordQuality.MAJOR: [0, 4, 7],
     ChordQuality.MINOR: [0, 3, 7],
-    ChordQuality.DOM7:  [0, 4, 7, 10],
-    ChordQuality.MAJ7:  [0, 4, 7, 11],
-    ChordQuality.MIN7:  [0, 3, 7, 10],
-    ChordQuality.DIM:   [0, 3, 6],
-    ChordQuality.AUG:   [0, 4, 8],
-    ChordQuality.SUS2:  [0, 2, 7],
-    ChordQuality.SUS4:  [0, 5, 7],
+    ChordQuality.DOM7: [0, 4, 7, 10],
+    ChordQuality.MAJ7: [0, 4, 7, 11],
+    ChordQuality.MIN7: [0, 3, 7, 10],
+    ChordQuality.DIM: [0, 3, 6],
+    ChordQuality.AUG: [0, 4, 8],
+    ChordQuality.SUS2: [0, 2, 7],
+    ChordQuality.SUS4: [0, 5, 7],
 }
 
 
@@ -177,18 +203,19 @@ def build_chord_notes(
 # Transport / project models used by tools as input schemas
 # ---------------------------------------------------------------------------
 
+
 class ConnectInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     port_name: str = Field(
         description='MIDI output port name. Partial match accepted (e.g. "IAC Driver"). '
-                    'Use fl_list_midi_ports to discover available names.',
+        "Use fl_list_midi_ports to discover available names.",
     )
     input_port_name: str | None = Field(
         default=None,
-        description='MIDI input port name for receiving FL Studio responses. '
-                    'Defaults to auto-detect using the same partial match as port_name. '
-                    'Pass "" to disable input entirely.',
+        description="MIDI input port name for receiving FL Studio responses. "
+        "Defaults to auto-detect using the same partial match as port_name. "
+        'Pass "" to disable input entirely.',
     )
     dry_run: bool = Field(
         default=False,
@@ -198,7 +225,10 @@ class ConnectInput(BaseModel):
 
 class WriteCommandInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    ack: bool = Field(default=False, description="Whether to wait for confirmation (ACK) from FL Studio.")
+    ack: bool = Field(
+        default=False,
+        description="Whether to wait for confirmation (ACK) from FL Studio.",
+    )
     timeout_ms: Annotated[int, Field(ge=50, le=10000)] = Field(
         default=200,
         description="How long to wait for ACK (if enabled), in milliseconds.",
@@ -310,7 +340,7 @@ class InsertArpeggioInput(WriteCommandInput):
 
 class InsertDrumPatternInput(WriteCommandInput):
     mapping: str = Field(
-        description="JSON dictionary mapping channel index strings to lists of 1s (hits) and 0s (rests) e.g., '{\"0\": [1,0,0,1], \"1\": [0,1,0,0]}'",
+        description='JSON dictionary mapping channel index strings to lists of 1s (hits) and 0s (rests) e.g., \'{"0": [1,0,0,1], "1": [0,1,0,0]}\'',
     )
     rhythm: str = Field(
         default="sixteenth",
@@ -335,8 +365,17 @@ class ChordStep(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    root_pitch: Annotated[int, Field(ge=0, le=127, description='Root note: MIDI int (60) or note name ("C4", "F#3")')] = 60
-    quality: ChordQuality = Field(default=ChordQuality.MAJOR, description="Chord quality")
+    root_pitch: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=127,
+            description='Root note: MIDI int (60) or note name ("C4", "F#3")',
+        ),
+    ] = 60
+    quality: ChordQuality = Field(
+        default=ChordQuality.MAJOR, description="Chord quality"
+    )
     velocity: Annotated[int, Field(ge=1, le=127)] = 100
     start_tick: Annotated[int, Field(ge=0)] = 0
     duration_ticks: Annotated[int, Field(ge=1)] = 384  # whole note default
@@ -369,18 +408,55 @@ class SaveProjectInput(WriteCommandInput):
     No filename can be set programmatically from a controller script.
     """
 
+    confirm: bool = Field(
+        default=False,
+        description="MUST be set to true to execute the save command. Prevents accidental project overwrites.",
+    )
+
+
+class ChannelInitInput(BaseModel):
+    """Input for initializing or modifying a channel in a project generator."""
+
+    name: str = Field(description="Name of the channel.")
+    sample_path: str | None = Field(default=None, description="Optional absolute path to an audio file/sample.")
+
+
+class GenerateProjectInput(WriteCommandInput):
+    """Input for generating/modifying an FL Studio project offline."""
+
+    output_path: str = Field(description="Absolute destination path to save the generated/modified .flp project.")
+    genre: str = Field(
+        default="empty",
+        description="Genre starter template. Allowed: 'trap', 'house', 'synthwave', 'empty'",
+    )
+    bpm: float | None = Field(
+        default=None,
+        description="BPM to set in the project (e.g. 140.0).",
+    )
+    title: str | None = Field(
+        default=None,
+        description="Project title/name metadata.",
+    )
+    channels: list[ChannelInitInput] | None = Field(
+        default=None,
+        description="Optional list of channels to initialize or modify.",
+    )
+
 
 # ---------------------------------------------------------------------------
 # New tool input models
 # ---------------------------------------------------------------------------
 
+
 class UndoInput(WriteCommandInput):
     """Input for navigating backward in history (Undo)."""
+
     pass
 
 
 class RedoInput(WriteCommandInput):
     """Input for navigating forward in history (Redo)."""
+
     pass
 
 
@@ -415,8 +491,12 @@ class ListChannelsInput(BaseModel):
 
 
 class SetChannelVolumeInput(WriteCommandInput):
-    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")] = 0
-    volume: Annotated[int, Field(ge=0, le=127, description="Volume level 0-127 (100 = unity gain)")] = 100
+    channel_index: Annotated[
+        int, Field(ge=0, le=127, description="Channel rack index (0-based)")
+    ] = 0
+    volume: Annotated[
+        int, Field(ge=0, le=127, description="Volume level 0-127 (100 = unity gain)")
+    ] = 100
 
 
 class CreatePatternInput(WriteCommandInput):
@@ -425,7 +505,9 @@ class CreatePatternInput(WriteCommandInput):
 
 
 class SelectPatternInput(WriteCommandInput):
-    pattern_index: Annotated[int, Field(ge=0, le=127, description="Pattern index to jump to (0-based)")]
+    pattern_index: Annotated[
+        int, Field(ge=0, le=127, description="Pattern index to jump to (0-based)")
+    ]
 
 
 class ListPatternsInput(BaseModel):
@@ -438,12 +520,16 @@ class ListPatternsInput(BaseModel):
 
 
 class MuteChannelInput(WriteCommandInput):
-    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
+    channel_index: Annotated[
+        int, Field(ge=0, le=127, description="Channel rack index (0-based)")
+    ]
     muted: bool = Field(default=True, description="True to mute, False to unmute.")
 
 
 class SoloChannelInput(WriteCommandInput):
-    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
+    channel_index: Annotated[
+        int, Field(ge=0, le=127, description="Channel rack index (0-based)")
+    ]
     soloed: bool = Field(default=True, description="True to solo, False to un-solo.")
 
 
@@ -459,10 +545,18 @@ class DisconnectInput(BaseModel):
     pass
 
 
-
 class SetChannelPanInput(WriteCommandInput):
-    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
-    pan: Annotated[int, Field(ge=0, le=127, description="Pan position: 0=full left, 64=centre, 127=full right")] = 64
+    channel_index: Annotated[
+        int, Field(ge=0, le=127, description="Channel rack index (0-based)")
+    ]
+    pan: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=127,
+            description="Pan position: 0=full left, 64=centre, 127=full right",
+        ),
+    ] = 64
 
 
 class GetNotesInput(BaseModel):
@@ -484,13 +578,26 @@ class GetContextInput(BaseModel):
 
 
 class SetPatternLengthInput(WriteCommandInput):
-    pattern_index: Annotated[int, Field(ge=0, le=999, description="Pattern index (0-based, up to 999)")]
-    length_beats: Annotated[int, Field(ge=1, le=999, description="Target pattern length in beats (1-999)")]
+    pattern_index: Annotated[
+        int, Field(ge=0, le=999, description="Pattern index (0-based, up to 999)")
+    ]
+    length_beats: Annotated[
+        int, Field(ge=1, le=999, description="Target pattern length in beats (1-999)")
+    ]
 
 
 class RenameChannelInput(WriteCommandInput):
-    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
-    name: Annotated[str, Field(min_length=1, max_length=14, description="New name (ASCII characters only, max 14 chars)")]
+    channel_index: Annotated[
+        int, Field(ge=0, le=127, description="Channel rack index (0-based)")
+    ]
+    name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=14,
+            description="New name (ASCII characters only, max 14 chars)",
+        ),
+    ]
 
     @field_validator("name")
     @classmethod
@@ -501,8 +608,17 @@ class RenameChannelInput(WriteCommandInput):
 
 
 class RenamePatternInput(WriteCommandInput):
-    pattern_index: Annotated[int, Field(ge=0, le=999, description="Pattern index (0-based, up to 999)")]
-    name: Annotated[str, Field(min_length=1, max_length=14, description="New name (ASCII characters only, max 14 chars)")]
+    pattern_index: Annotated[
+        int, Field(ge=0, le=999, description="Pattern index (0-based, up to 999)")
+    ]
+    name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=14,
+            description="New name (ASCII characters only, max 14 chars)",
+        ),
+    ]
 
     @field_validator("name")
     @classmethod
@@ -513,87 +629,333 @@ class RenamePatternInput(WriteCommandInput):
 
 
 class SetMixerVolumeInput(WriteCommandInput):
-    track_index: Annotated[int, Field(ge=0, le=127, description="Mixer track index (0-127)")] = 0
-    volume: Annotated[int, Field(ge=0, le=127, description="Volume level 0-127 (100 = unity gain / 100% fader in FL)")] = 100
+    track_index: Annotated[
+        int, Field(ge=0, le=127, description="Mixer track index (0-127)")
+    ] = 0
+    volume: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=127,
+            description="Volume level 0-127 (100 = unity gain / 100% fader in FL)",
+        ),
+    ] = 100
 
 
 class SetMixerPanInput(WriteCommandInput):
-    track_index: Annotated[int, Field(ge=0, le=127, description="Mixer track index (0-127)")]
-    pan: Annotated[int, Field(ge=0, le=127, description="Pan position: 0=full left, 64=centre, 127=full right")] = 64
+    track_index: Annotated[
+        int, Field(ge=0, le=127, description="Mixer track index (0-127)")
+    ]
+    pan: Annotated[
+        int,
+        Field(
+            ge=0,
+            le=127,
+            description="Pan position: 0=full left, 64=centre, 127=full right",
+        ),
+    ] = 64
 
 
 class RouteToMixerInput(WriteCommandInput):
-    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index (0-based)")]
-    track_index: Annotated[int, Field(ge=0, le=127, description="Mixer track index (0-127) to route to")]
+    channel_index: Annotated[
+        int, Field(ge=0, le=127, description="Channel rack index (0-based)")
+    ]
+    track_index: Annotated[
+        int, Field(ge=0, le=127, description="Mixer track index (0-127) to route to")
+    ]
 
 
 class GetMixerStateInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    start_track: Annotated[int, Field(ge=0, le=127, description="Start track index (0-127)")] = 0
-    end_track: Annotated[int, Field(ge=0, le=127, description="End track index (0-127)")] = 16
-    timeout_ms: Annotated[int, Field(ge=100, le=10000, description="How long to wait for response in milliseconds")] = 2000
+    start_track: Annotated[
+        int, Field(ge=0, le=127, description="Start track index (0-127)")
+    ] = 0
+    end_track: Annotated[
+        int, Field(ge=0, le=127, description="End track index (0-127)")
+    ] = 16
+    timeout_ms: Annotated[
+        int,
+        Field(
+            ge=100,
+            le=10000,
+            description="How long to wait for response in milliseconds",
+        ),
+    ] = 2000
 
 
 # --- Option 2: Preset Librarian Pydantic Inputs ---
 
+
 class CatalogPresetInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vst_name: Annotated[str, Field(min_length=1, max_length=100, description="The name of the VST plug-in (e.g. Serum, Vital)")]
-    preset_name: Annotated[str, Field(min_length=1, max_length=100, description="The name of the VST preset to catalog")]
+    vst_name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=100,
+            description="The name of the VST plug-in (e.g. Serum, Vital)",
+        ),
+    ]
+    preset_name: Annotated[
+        str,
+        Field(
+            min_length=1,
+            max_length=100,
+            description="The name of the VST preset to catalog",
+        ),
+    ]
     x: Annotated[int, Field(ge=0, description="X screen coordinate for mouse click")]
     y: Annotated[int, Field(ge=0, description="Y screen coordinate for mouse click")]
-    category: Annotated[str, Field(default="Unsorted", description="Optional preset category (e.g. Leads, Pads, Basses)")]
-    tags: Annotated[Optional[List[str]], Field(default=None, description="Optional search tags for categorization")] = None
-    notes: Annotated[str, Field(default="", description="Descriptive notes or documentation about the preset")] = ""
+    category: Annotated[
+        str,
+        Field(
+            default="Unsorted",
+            description="Optional preset category (e.g. Leads, Pads, Basses)",
+        ),
+    ]
+    tags: Annotated[
+        Optional[List[str]],
+        Field(default=None, description="Optional search tags for categorization"),
+    ] = None
+    notes: Annotated[
+        str,
+        Field(
+            default="",
+            description="Descriptive notes or documentation about the preset",
+        ),
+    ] = ""
 
 
 class SearchPresetsInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    query: Annotated[Optional[str], Field(default=None, description="Keyword search query across name, notes, category, and tags")] = None
-    vst_name: Annotated[Optional[str], Field(default=None, description="Filter presets by specific VST name")] = None
-    tag: Annotated[Optional[str], Field(default=None, description="Filter presets by a single tag")] = None
-    category: Annotated[Optional[str], Field(default=None, description="Filter presets by a specific category")] = None
+    query: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            description="Keyword search query across name, notes, category, and tags",
+        ),
+    ] = None
+    vst_name: Annotated[
+        Optional[str],
+        Field(default=None, description="Filter presets by specific VST name"),
+    ] = None
+    tag: Annotated[
+        Optional[str], Field(default=None, description="Filter presets by a single tag")
+    ] = None
+    category: Annotated[
+        Optional[str],
+        Field(default=None, description="Filter presets by a specific category"),
+    ] = None
 
 
 class LoadPresetInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    vst_name: Annotated[str, Field(min_length=1, description="The name of the VST plug-in")]
-    preset_name: Annotated[str, Field(min_length=1, description="The name of the preset to load")]
+    vst_name: Annotated[
+        str, Field(min_length=1, description="The name of the VST plug-in")
+    ]
+    preset_name: Annotated[
+        str, Field(min_length=1, description="The name of the preset to load")
+    ]
 
 
 # --- Option 3: Algorithmic Composition Pydantic Inputs ---
 
+
 class InsertEuclideanDrumsInput(WriteCommandInput):
-    mapping: Annotated[str, Field(description="JSON dict string mapping channel index strings to binary sequencer hit length, e.g. '{\"0\": [1,0,0,1]}'")]
-    rhythm: Annotated[str, Field(default="sixteenth", description="The step subdivision speed, e.g. 'sixteenth', 'eighth', 'quarter'")] = "sixteenth"
-    start_tick: Annotated[int, Field(default=0, ge=0, description="Starting tick offset (96 PPQ)")] = 0
-    hits: Annotated[int, Field(default=5, ge=1, le=64, description="Number of hits to distribute")] = 5
-    steps: Annotated[int, Field(default=16, ge=1, le=128, description="Length of sequence loop steps")] = 16
-    rotation: Annotated[int, Field(default=0, description="Left/right circular shift (rotation) of Euclidean rhythm")] = 0
-    velocity_curve: Annotated[str, Field(default="none", description="Velocity curves: 'none', 'humanize', 'crescendo', 'decrescendo'")] = "none"
-    swing: Annotated[float, Field(default=0.0, ge=0.0, le=1.0, description="Swing quantization shift factor")] = 0.0
+    mapping: Annotated[
+        str,
+        Field(
+            description="JSON dict string mapping channel index strings to binary sequencer hit length, e.g. '{\"0\": [1,0,0,1]}'"
+        ),
+    ]
+    rhythm: Annotated[
+        str,
+        Field(
+            default="sixteenth",
+            description="The step subdivision speed, e.g. 'sixteenth', 'eighth', 'quarter'",
+        ),
+    ] = "sixteenth"
+    start_tick: Annotated[
+        int, Field(default=0, ge=0, description="Starting tick offset (96 PPQ)")
+    ] = 0
+    hits: Annotated[
+        int, Field(default=5, ge=1, le=64, description="Number of hits to distribute")
+    ] = 5
+    steps: Annotated[
+        int,
+        Field(default=16, ge=1, le=128, description="Length of sequence loop steps"),
+    ] = 16
+    rotation: Annotated[
+        int,
+        Field(
+            default=0,
+            description="Left/right circular shift (rotation) of Euclidean rhythm",
+        ),
+    ] = 0
+    velocity_curve: Annotated[
+        str,
+        Field(
+            default="none",
+            description="Velocity curves: 'none', 'humanize', 'crescendo', 'decrescendo'",
+        ),
+    ] = "none"
+    swing: Annotated[
+        float,
+        Field(
+            default=0.0, ge=0.0, le=1.0, description="Swing quantization shift factor"
+        ),
+    ] = 0.0
 
 
 class GenerateMarkovMelodyInput(WriteCommandInput):
-    root: Annotated[str, Field(default="C5", description="Root note name (e.g. C5, F#4)")] = "C5"
-    scale: Annotated[str, Field(default="minor", description="Scale type (e.g. major, minor, dorian, harmonic_minor)")] = "minor"
-    length_beats: Annotated[float, Field(default=4.0, ge=0.5, le=32.0, description="Length of melody in beats")] = 4.0
-    rate: Annotated[str, Field(default="eighth", description="Step note division speed: 'sixteenth', 'eighth', 'quarter'")] = "eighth"
-    channel_index: Annotated[int, Field(default=0, ge=0, le=127, description="Target instrument channel index")] = 0
-    start_tick: Annotated[int, Field(default=0, ge=0, description="Start tick offset (96 PPQ)")] = 0
-    velocity_curve: Annotated[str, Field(default="humanize", description="Velocity curves: 'none', 'humanize', 'crescendo', 'decrescendo'")] = "humanize"
-    swing: Annotated[float, Field(default=0.0, ge=0.0, le=1.0, description="Swing quantization shift factor")] = 0.0
+    root: Annotated[
+        str, Field(default="C5", description="Root note name (e.g. C5, F#4)")
+    ] = "C5"
+    scale: Annotated[
+        str,
+        Field(
+            default="minor",
+            description="Scale type (e.g. major, minor, dorian, harmonic_minor)",
+        ),
+    ] = "minor"
+    length_beats: Annotated[
+        float,
+        Field(default=4.0, ge=0.5, le=32.0, description="Length of melody in beats"),
+    ] = 4.0
+    rate: Annotated[
+        str,
+        Field(
+            default="eighth",
+            description="Step note division speed: 'sixteenth', 'eighth', 'quarter'",
+        ),
+    ] = "eighth"
+    channel_index: Annotated[
+        int,
+        Field(default=0, ge=0, le=127, description="Target instrument channel index"),
+    ] = 0
+    start_tick: Annotated[
+        int, Field(default=0, ge=0, description="Start tick offset (96 PPQ)")
+    ] = 0
+    velocity_curve: Annotated[
+        str,
+        Field(
+            default="humanize",
+            description="Velocity curves: 'none', 'humanize', 'crescendo', 'decrescendo'",
+        ),
+    ] = "humanize"
+    swing: Annotated[
+        float,
+        Field(
+            default=0.0, ge=0.0, le=1.0, description="Swing quantization shift factor"
+        ),
+    ] = 0.0
 
 
 class InsertVoiceLedProgressionInput(WriteCommandInput):
-    progression: Annotated[str, Field(description="Comma-separated chord progression, e.g. 'C5-major, G5-major, A4-minor, F4-major'")]
-    rate: Annotated[str, Field(default="half", description="Chord change division: 'whole', 'half', 'quarter'")] = "half"
-    channel_index: Annotated[int, Field(default=0, ge=0, le=127, description="Target instrument channel index")] = 0
-    start_tick: Annotated[int, Field(default=0, ge=0, description="Start tick offset (96 PPQ)")] = 0
-    velocity_curve: Annotated[str, Field(default="none", description="Velocity curves: 'none', 'humanize', 'crescendo', 'decrescendo'")] = "none"
-    swing: Annotated[float, Field(default=0.0, ge=0.0, le=1.0, description="Swing quantization shift factor")] = 0.0
+    progression: Annotated[
+        str,
+        Field(
+            description="Comma-separated chord progression, e.g. 'C5-major, G5-major, A4-minor, F4-major'"
+        ),
+    ]
+    rate: Annotated[
+        str,
+        Field(
+            default="half",
+            description="Chord change division: 'whole', 'half', 'quarter'",
+        ),
+    ] = "half"
+    channel_index: Annotated[
+        int,
+        Field(default=0, ge=0, le=127, description="Target instrument channel index"),
+    ] = 0
+    start_tick: Annotated[
+        int, Field(default=0, ge=0, description="Start tick offset (96 PPQ)")
+    ] = 0
+    velocity_curve: Annotated[
+        str,
+        Field(
+            default="none",
+            description="Velocity curves: 'none', 'humanize', 'crescendo', 'decrescendo'",
+        ),
+    ] = "none"
+    swing: Annotated[
+        float,
+        Field(
+            default=0.0, ge=0.0, le=1.0, description="Swing quantization shift factor"
+        ),
+    ] = 0.0
 
+
+class SetGridBitInput(WriteCommandInput):
+    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index")]
+    step_index: Annotated[int, Field(ge=0, le=127, description="Step sequence index (e.g., 0-15)")]
+    value: Annotated[int, Field(ge=0, le=1, description="1 to enable step, 0 to disable")]
+
+
+class MutePlaylistTrackInput(WriteCommandInput):
+    track_index: Annotated[int, Field(ge=0, le=127, description="Playlist track index (1-based generally, but test 0-based in FL API)")]
+    muted: bool
+
+
+class SoloPlaylistTrackInput(WriteCommandInput):
+    track_index: Annotated[int, Field(ge=0, le=127, description="Playlist track index")]
+    soloed: bool
+
+
+class SetTimeSelectionInput(WriteCommandInput):
+    start_bar: Annotated[int, Field(ge=0, le=999, description="Start bar for selection loop")]
+    end_bar: Annotated[int, Field(ge=0, le=999, description="End bar for selection loop")]
+
+
+class SetChannelColorInput(WriteCommandInput):
+    channel_index: Annotated[int, Field(ge=0, le=127, description="Channel rack index")]
+    r: Annotated[int, Field(ge=0, le=255)]
+    g: Annotated[int, Field(ge=0, le=255)]
+    b: Annotated[int, Field(ge=0, le=255)]
+
+
+class SetPatternColorInput(BaseModel):
+    pattern_index: int = Field(..., description="The pattern number to color.")
+    color_hex: int = Field(..., description="The 24-bit RGB hex code for the color (e.g. 0x00RRGGBB).")
+
+
+# --- Phase 7 Enhancements ---
+
+class SetChannelNameInput(BaseModel):
+    channel_index: int = Field(..., description="The channel index to rename.")
+    name: str = Field(..., description="The new name for the channel. Use empty string to reset to default.")
+
+class SetChannelMixerTrackInput(BaseModel):
+    channel_index: int = Field(..., description="The channel index.")
+    track_index: int = Field(..., description="The mixer track number to route this channel to (0 = Master, 1-125 = Inserts).")
+
+class UiNavigateInput(BaseModel):
+    action: str = Field(
+        ...,
+        description="The UI action to perform. Valid actions: 'up', 'down', 'left', 'right', 'enter', 'escape', 'focus_browser', 'focus_channel_rack', 'focus_mixer', 'focus_playlist'"
+    )
+
+
+class RenderProjectInput(WriteCommandInput):
+    """Input for rendering an FL Studio project to audio via headless CLI or fallback simulator."""
+    project_path: str = Field(..., description="Absolute path to the source FL Studio project (.flp) to render.")
+    output_path: str = Field(..., description="Absolute destination path to save the rendered audio file.")
+    format: str = Field(default="wav", description="Render output format. Valid choices: 'wav', 'mp3', 'ogg', 'flac', 'mid'. Defaults to 'wav'.")
+    bitrate: int | None = Field(default=None, description="Bitrate for MP3/OGG (e.g. 192, 320) or bit-depth for WAV/FLAC (16, 24, 32).")
+
+
+class GetTrackPeaksInput(BaseModel):
+    """Input for retrieving peak levels of a mixer track."""
+    track_index: int = Field(default=0, ge=0, le=127, description="Mixer track index (0 = Master, 1-127 = Inserts).")
+
+
+class AutoMixInput(WriteCommandInput):
+    """Input for the fader balancer mixing assistant."""
+    tracks: list[int] = Field(..., description="List of mixer track indices to analyze and balance (1-127).")
+    target_db: float = Field(default=-12.0, ge=-48.0, le=0.0, description="Target peak level in dB for the balanced tracks.")
+    headroom_db: float = Field(default=-3.0, ge=-12.0, le=0.0, description="Additional headroom or scaling margin.")

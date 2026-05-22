@@ -9,14 +9,15 @@ from ..errors import FLMCPError, ErrorCode
 
 _librarian = None
 
+
 def get_librarian() -> PresetLibrarian:
     global _librarian
     if _librarian is None:
         _librarian = PresetLibrarian()
     return _librarian
 
-def register(mcp: FastMCP) -> None:
 
+def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="fl_catalog_vst_preset",
         annotations={
@@ -42,15 +43,14 @@ def register(mcp: FastMCP) -> None:
                 y=params.y,
                 category=params.category,
                 tags=params.tags,
-                notes=params.notes
+                notes=params.notes,
             )
-            return format_result({
-                "success": True,
-                "preset": entry
-            })
+            return format_result({"success": True, "preset": entry})
         except Exception as e:
             return format_result(
-                FLMCPError(ErrorCode.UNKNOWN, f"Failed to catalog preset: {e}").to_dict()
+                FLMCPError(
+                    ErrorCode.UNKNOWN, f"Failed to catalog preset: {e}"
+                ).to_dict()
             )
 
     @mcp.tool(
@@ -74,15 +74,14 @@ def register(mcp: FastMCP) -> None:
                 query=params.query,
                 vst_name=params.vst_name,
                 tag=params.tag,
-                category=params.category
+                category=params.category,
             )
-            return format_result({
-                "success": True,
-                "presets": results
-            })
+            return format_result({"success": True, "presets": results})
         except Exception as e:
             return format_result(
-                FLMCPError(ErrorCode.UNKNOWN, f"Failed to search presets: {e}").to_dict()
+                FLMCPError(
+                    ErrorCode.UNKNOWN, f"Failed to search presets: {e}"
+                ).to_dict()
             )
 
     @mcp.tool(
@@ -107,15 +106,17 @@ def register(mcp: FastMCP) -> None:
             return format_result(
                 FLMCPError(
                     ErrorCode.INVALID_PARAMS,
-                    f"Preset '{params.preset_name}' for VST '{params.vst_name}' not found."
+                    f"Preset '{params.preset_name}' for VST '{params.vst_name}' not found.",
                 ).to_dict()
             )
-        
+
         automation = get_automation()
         success = automation.click_at(preset["x"], preset["y"])
-        return format_result({
-            "success": success,
-            "vst_name": params.vst_name,
-            "preset_name": params.preset_name,
-            "coordinates": {"x": preset["x"], "y": preset["y"]}
-        })
+        return format_result(
+            {
+                "success": success,
+                "vst_name": params.vst_name,
+                "preset_name": params.preset_name,
+                "coordinates": {"x": preset["x"], "y": preset["y"]},
+            }
+        )

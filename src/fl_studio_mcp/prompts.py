@@ -2,6 +2,7 @@
 
 from mcp.server.fastmcp import FastMCP
 
+
 def register(mcp: FastMCP) -> None:
     """Register all pre-built developer and creative prompts on the FastMCP instance."""
 

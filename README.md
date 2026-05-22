@@ -15,9 +15,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue?style=for-the-badge&logo=python" alt="Python Versions"/>
+  <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-blue?style=for-the-badge&logo=python" alt="Python Versions"/>
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-green?style=for-the-badge" alt="Platforms"/>
-  <img src="https://img.shields.io/badge/Tests-326%20Passing-brightgreen?style=for-the-badge" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-337%20Passing-success?style=for-the-badge&logo=pytest" alt="Tests"/>
   <img src="https://img.shields.io/badge/License-MIT-orange?style=for-the-badge" alt="License"/>
 </p>
 
@@ -70,9 +70,9 @@ The codebase is highly modular and strictly structured:
 
 ---
 
-## 🎛️ Complete Tools Reference (44 Tools)
+## 🎛️ Complete Tools Reference (51 Tools)
 
-FL Studio MCP exposes a robust catalog of **44 FastMCP tools** organized into clean functional areas:
+FL Studio MCP exposes a robust catalog of **51 FastMCP tools** organized into clean functional areas:
 
 ### 1. Connection & Diagnostics (3)
 | Tool Name | Description | Needs Bridge Script |
@@ -170,6 +170,18 @@ FL Studio MCP exposes a robust catalog of **44 FastMCP tools** organized into cl
 | `fl_generate_markov_melody` | Generates organic, scale-constrained melodies using transition probability tables. | **Yes** |
 | `fl_insert_voice_led_progression` | Inserts chord progressions with minimized pitch transpositions (voice-leading solver). | **Yes** |
 
+### 14. Super-Producer AI Tools (7)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_analyze_sample` | Analyzes `.wav` files via `librosa` for BPM, Key, and transient detection. | **No** |
+| `fl_auto_slice` | Chops loops into discrete samples based on DSP transient detection. | **No** |
+| `fl_vision_read_vst` | Captures screen (`mss`) and mocks a VLM to "read" non-automatable synth UIs. | **No** |
+| `fl_vision_click_vst` | Executes coordinate-based PyAutoGUI clicks on Vision-derived UI nodes. | **No** |
+| `fl_separate_stems` | Isolates vocals, drums, bass, and other using Demucs. | **No** |
+| `fl_render_stems` | Bounces isolated tracks iteratively using the headless render macro. | **No** |
+| `fl_generate_sequence` | Simulates a Generative MIDI Transformer to output realistic 16-bar drum/melody grooves. | **Yes** |
+| `fl_sync_session` | Zips `.flp` and audio files, then sends a Webhook (e.g., Discord) alert. | **No** |
+
 ---
 
 ## 📦 Installation & Setup
@@ -251,7 +263,7 @@ uv run fl-studio panic
 
 ## 🧪 Comprehensive Tests (100% Green)
 
-The server is backed by a massive **326-test suite** covering MIDI packet serializations, music theory matrix mathematics, concurrent lock scheduling, mock OS AppleScript/VBScript string matches, and WebSocket network connection lifecycles:
+The server is backed by a massive **337-test suite** covering MIDI packet serializations, music theory matrix mathematics, concurrent lock scheduling, mock OS AppleScript/VBScript string matches, and WebSocket network connection lifecycles:
 
 ```bash
 # Run the complete test suite (runs fully in-memory, no hardware required!)

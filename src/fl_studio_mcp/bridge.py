@@ -18,7 +18,7 @@ import json
 import queue as thread_queue
 import sys
 import time
-from typing import Any, Callable
+from typing import Any
 
 import mido
 
@@ -37,6 +37,7 @@ class FLStudioBridge:
 
     def __init__(self) -> None:
         import os
+
         self._output_port: mido.ports.BaseOutput | None = None
         self._input_port: mido.ports.BaseInput | None = None
         self._output_port_name: str = ""
@@ -44,7 +45,9 @@ class FLStudioBridge:
         self._transport: MIDITransport = get_transport()
         self._dry_run: bool = os.getenv("FL_MCP_DRY_RUN", "0") == "1"
         # Thread-safe queue for MIDI responses from FL Studio
-        self._response_queue: thread_queue.Queue[dict[str, Any]] = thread_queue.Queue(maxsize=64)
+        self._response_queue: thread_queue.Queue[dict[str, Any]] = thread_queue.Queue(
+            maxsize=64
+        )
         # Lock to serialise concurrent bidirectional queries (prevents response swapping)
         self._query_lock: asyncio.Lock | None = None
 
@@ -136,7 +139,9 @@ class FLStudioBridge:
         # --- Input port (bidirectional) ---
         # Use the explicit hint, or fall back to the same hint as the output.
         # Pass input_port_hint="" to skip.
-        effective_input_hint = input_port_hint if input_port_hint is not None else port_name_hint
+        effective_input_hint = (
+            input_port_hint if input_port_hint is not None else port_name_hint
+        )
         if effective_input_hint:
             self._start_listener(effective_input_hint)
 
@@ -152,7 +157,9 @@ class FLStudioBridge:
             inputs = self._transport.list_input_ports()
             exact_in = self._transport.resolve_port(hint, inputs)
             self._close_input()
-            self._input_port = self._transport.open_input(exact_in, callback=self._on_midi_in)
+            self._input_port = self._transport.open_input(
+                exact_in, callback=self._on_midi_in
+            )
             self._input_port_name = exact_in
             return True
         except Exception:
@@ -266,7 +273,12 @@ class FLStudioBridge:
         if not self.listening:
             # If no input port is active, we cannot listen for ACK, so we degrade gracefully
             self.send_raw(raw_bytes)
-            return {"sent": True, "bytes": hex_str, "ack_received": False, "reason": "No input listener"}
+            return {
+                "sent": True,
+                "bytes": hex_str,
+                "ack_received": False,
+                "reason": "No input listener",
+            }
 
         from .protocol import RESP_ACK, decode_resp_ack
 
@@ -281,7 +293,11 @@ class FLStudioBridge:
                     if item["cmd"] == RESP_ACK:
                         acked_cmd = decode_resp_ack(item["payload"])
                         if acked_cmd == cmd_byte:
-                            return {"sent": True, "bytes": hex_str, "ack_received": True}
+                            return {
+                                "sent": True,
+                                "bytes": hex_str,
+                                "ack_received": True,
+                            }
                     # Put it back if it's not ours
                     try:
                         self._response_queue.put_nowait(item)
@@ -294,7 +310,7 @@ class FLStudioBridge:
         raise FLMCPError(
             ErrorCode.TIMEOUT,
             f"Command {cmd_byte:#x} write verification (ACK) timed out after {timeout_ms}ms.",
-            {"cmd": cmd_byte, "timeout_ms": timeout_ms}
+            {"cmd": cmd_byte, "timeout_ms": timeout_ms},
         )
 
     async def send_write(
@@ -309,7 +325,6 @@ class FLStudioBridge:
             return await self.send_raw_with_ack(raw_bytes, cmd_byte, timeout_ms)
         else:
             return self.send_raw(raw_bytes)
-
 
     # ------------------------------------------------------------------
     # Bidirectional query
@@ -381,11 +396,11 @@ class FLStudioBridge:
 
     def status(self) -> dict[str, Any]:
         return {
-            "connected":         self.connected,
-            "port":              self._output_port_name,
-            "input_port":        self._input_port_name,
-            "listening":         self.listening,
-            "dry_run":           self._dry_run,
+            "connected": self.connected,
+            "port": self._output_port_name,
+            "input_port": self._input_port_name,
+            "listening": self.listening,
+            "dry_run": self._dry_run,
             "platform_transport": type(self._transport).__name__,
         }
 
@@ -393,3 +408,15 @@ class FLStudioBridge:
 def format_result(data: dict[str, Any]) -> str:
     """Consistent JSON serialisation for tool return values."""
     return json.dumps(data, indent=2)
+
+
+def send_command_sync(cmd: int, payload: list[int]) -> bool:
+    """Synchronously send a command to FL Studio via SysEx."""
+    from .protocol import _SYSEX_START, _MANUFACTURER_ID, _SYSEX_END
+    raw_bytes = bytes([_SYSEX_START, _MANUFACTURER_ID, cmd]) + bytes(payload) + bytes([_SYSEX_END])
+    try:
+        FLStudioBridge.get().send_raw(raw_bytes)
+        return True
+    except Exception:
+        return False
+

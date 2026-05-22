@@ -3,7 +3,6 @@
 import pytest
 
 from fl_studio_mcp.models import (
-    AddChordProgressionInput,
     ChordQuality,
     ChordStep,
     Note,
@@ -25,6 +24,7 @@ from fl_studio_mcp.protocol import (
 # ---------------------------------------------------------------------------
 # Note model validation
 # ---------------------------------------------------------------------------
+
 
 class TestNoteModel:
     def test_defaults(self):
@@ -60,6 +60,7 @@ class TestNoteModel:
 # Protocol: MMC messages
 # ---------------------------------------------------------------------------
 
+
 class TestMMC:
     def test_play_bytes(self):
         assert mmc_play() == bytes([0xF0, 0x7F, 0x7F, 0x06, 0x02, 0xF7])
@@ -71,6 +72,7 @@ class TestMMC:
 # ---------------------------------------------------------------------------
 # Protocol: tempo encoding
 # ---------------------------------------------------------------------------
+
 
 class TestTempoProtocol:
     @pytest.mark.parametrize("bpm", [20, 60, 120, 140, 180, 999])
@@ -102,14 +104,19 @@ class TestTempoProtocol:
 # Protocol: note encoding
 # ---------------------------------------------------------------------------
 
+
 class TestNotesProtocol:
     def _make_note(self, **kwargs):
-        defaults = dict(pitch=60, velocity=100, channel=0, start_tick=0, duration_ticks=96)
+        defaults = dict(
+            pitch=60, velocity=100, channel=0, start_tick=0, duration_ticks=96
+        )
         defaults.update(kwargs)
         return defaults
 
     def test_single_note_roundtrip(self):
-        note = self._make_note(pitch=60, velocity=90, channel=1, start_tick=192, duration_ticks=48)
+        note = self._make_note(
+            pitch=60, velocity=90, channel=1, start_tick=192, duration_ticks=48
+        )
         encoded = encode_notes([note])
         cmd, payload = decode_sysex(encoded)
         assert cmd == 0x04
@@ -119,8 +126,8 @@ class TestNotesProtocol:
 
     def test_multiple_notes_roundtrip(self):
         notes = [
-            self._make_note(pitch=60, start_tick=0,   duration_ticks=96),
-            self._make_note(pitch=64, start_tick=96,  duration_ticks=96),
+            self._make_note(pitch=60, start_tick=0, duration_ticks=96),
+            self._make_note(pitch=64, start_tick=96, duration_ticks=96),
             self._make_note(pitch=67, start_tick=192, duration_ticks=96),
         ]
         encoded = encode_notes(notes)
@@ -137,7 +144,9 @@ class TestNotesProtocol:
         assert decoded[0]["start_tick"] == 2_000_000
 
     def test_all_bytes_7bit(self):
-        note = self._make_note(pitch=127, velocity=127, channel=15, start_tick=99999, duration_ticks=384)
+        note = self._make_note(
+            pitch=127, velocity=127, channel=15, start_tick=99999, duration_ticks=384
+        )
         raw = encode_notes([note])
         for b in raw[1:-1]:
             assert b <= 0x7F
@@ -150,6 +159,7 @@ class TestNotesProtocol:
 # ---------------------------------------------------------------------------
 # Protocol: save encoding
 # ---------------------------------------------------------------------------
+
 
 class TestSaveProtocol:
     def test_save_command_byte(self):
@@ -169,6 +179,7 @@ class TestSaveProtocol:
 # Model: SaveProjectInput (no filename field)
 # ---------------------------------------------------------------------------
 
+
 class TestSaveProjectInput:
     def test_empty_input_accepted(self):
         SaveProjectInput()  # no fields needed
@@ -181,6 +192,7 @@ class TestSaveProjectInput:
 # ---------------------------------------------------------------------------
 # Chord / progression tests
 # ---------------------------------------------------------------------------
+
 
 class TestChordProgression:
     def test_build_chord_notes_major(self):
@@ -208,4 +220,3 @@ class TestChordProgression:
 
         with pytest.raises(Exception):
             ChordStep(root_pitch=128)
-

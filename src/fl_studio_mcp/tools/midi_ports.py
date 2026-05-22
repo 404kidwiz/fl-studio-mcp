@@ -4,12 +4,10 @@ import json
 
 from mcp.server.fastmcp import FastMCP
 
-from ..bridge import FLStudioBridge
 from ..transports import get_transport
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_list_midi_ports",
         annotations={
@@ -48,6 +46,7 @@ def register(mcp: FastMCP) -> None:
         )
 
         import sys
+
         if sys.platform == "darwin":
             platform_hint = (
                 "macOS: enable IAC Driver in Audio MIDI Setup. "

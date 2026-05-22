@@ -5,13 +5,11 @@ All tests run in dry-run mode — no MIDI hardware required.
 """
 
 import json
-import sys
 from io import StringIO
 from unittest.mock import patch
 
 import pytest
 
-from fl_studio_mcp.bridge import FLStudioBridge
 from fl_studio_mcp.models import (
     DisconnectInput,
     Note,
@@ -28,6 +26,7 @@ from fl_studio_mcp.protocol import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def parse(result: str) -> dict:
     return json.loads(result)
 
@@ -35,6 +34,7 @@ def parse(result: str) -> dict:
 def _tool(module_name: str, tool_name: str):
     import importlib
     from mcp.server.fastmcp import FastMCP
+
     mod = importlib.import_module(f"fl_studio_mcp.tools.{module_name}")
     _mcp = FastMCP("test")
     mod.register(_mcp)
@@ -44,6 +44,7 @@ def _tool(module_name: str, tool_name: str):
 # ===========================================================================
 # Note Name Parsing
 # ===========================================================================
+
 
 class TestNoteNameToPitch:
     """Unit tests for the note_name_to_pitch() function."""
@@ -183,6 +184,7 @@ class TestChordStepRootPitch:
 # Protocol: encode_set_channel_pan
 # ===========================================================================
 
+
 class TestNewProtocol:
     def test_set_channel_pan_cmd(self):
         raw = encode_set_channel_pan(3, 64)
@@ -217,6 +219,7 @@ class TestNewProtocol:
 # Tool: fl_disconnect
 # ===========================================================================
 
+
 class TestFlDisconnect:
     async def test_disconnect_returns_disconnected_flag(self, dry_bridge):
         fn = _tool("connection", "fl_disconnect")
@@ -247,10 +250,10 @@ class TestFlDisconnect:
         assert result["disconnected"] is True
 
 
-
 # ===========================================================================
 # Tool: fl_set_channel_pan
 # ===========================================================================
+
 
 class TestFlSetChannelPan:
     async def test_dry_run_centre(self, dry_bridge):
@@ -297,6 +300,7 @@ class TestFlSetChannelPan:
 # Bridge: queue overflow logging
 # ===========================================================================
 
+
 class TestQueueOverflowLogging:
     def test_overflow_prints_to_stderr(self, dry_bridge):
         """Filling the queue beyond maxsize should log to stderr, not silently drop."""
@@ -311,13 +315,15 @@ class TestQueueOverflowLogging:
         # Now trigger the overflow path in _on_midi_in by constructing a fake call
         captured = StringIO()
         with patch("sys.stderr", captured):
-            bridge._on_midi_in.__func__ if hasattr(bridge._on_midi_in, "__func__") else None
+            bridge._on_midi_in.__func__ if hasattr(
+                bridge._on_midi_in, "__func__"
+            ) else None
             # Directly test the overflow branch
             import queue as thread_queue
+
             try:
                 bridge._response_queue.put_nowait({"cmd": 0xFF, "payload": []})
             except thread_queue.Full:
-                import sys as _sys
                 print(
                     "[FL MCP Bridge] WARNING: response queue full — dropping cmd 0xff.",
                     file=captured,
@@ -329,6 +335,7 @@ class TestQueueOverflowLogging:
 # ===========================================================================
 # Bridge: asyncio.Lock prevents concurrent query swapping
 # ===========================================================================
+
 
 class TestConcurrentQueryLock:
     async def test_lock_created_on_first_query(self, dry_bridge):
@@ -345,6 +352,7 @@ class TestConcurrentQueryLock:
     async def test_lock_is_asyncio_lock_when_created(self, dry_bridge):
         """_get_query_lock() returns an asyncio.Lock instance."""
         import asyncio
+
         bridge = dry_bridge
         lock = bridge._get_query_lock()
         assert isinstance(lock, asyncio.Lock)

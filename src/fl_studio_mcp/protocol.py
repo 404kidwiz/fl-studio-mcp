@@ -42,45 +42,69 @@ _SYSEX_END = 0xF7
 _MANUFACTURER_ID = 0x7D  # non-commercial / development
 
 # Server → FL Studio commands
-CMD_PLAY             = 0x01
-CMD_STOP             = 0x02
-CMD_SET_TEMPO        = 0x03
-CMD_NOTES            = 0x04
-CMD_SAVE             = 0x05
-CMD_QUERY_STATUS     = 0x06
-CMD_QUERY_CHANNELS   = 0x07
-CMD_SET_CHANNEL_VOL  = 0x08
-CMD_NEW_PATTERN      = 0x09
-CMD_SELECT_PATTERN   = 0x0A
+CMD_PLAY = 0x01
+CMD_STOP = 0x02
+CMD_SET_TEMPO = 0x03
+CMD_NOTES = 0x04
+CMD_SAVE = 0x05
+CMD_QUERY_STATUS = 0x06
+CMD_QUERY_CHANNELS = 0x07
+CMD_SET_CHANNEL_VOL = 0x08
+CMD_NEW_PATTERN = 0x09
+CMD_SELECT_PATTERN = 0x0A
 # 0x0B reserved
-CMD_QUERY_PATTERNS   = 0x0C
-CMD_MUTE_CHANNEL     = 0x0D
-CMD_SOLO_CHANNEL     = 0x0E
+CMD_QUERY_PATTERNS = 0x0C
+CMD_MUTE_CHANNEL = 0x0D
+CMD_SOLO_CHANNEL = 0x0E
 # 0x0F removed in v1.4 (patterns.clearCurrentPattern does not exist in FL API)
-CMD_SET_CHANNEL_PAN  = 0x13   # [ch_idx, pan] both 0-127; 64 = centre
-CMD_GET_NOTES        = 0x14
+CMD_SET_CHANNEL_PAN = 0x13  # [ch_idx, pan] both 0-127; 64 = centre
+CMD_GET_NOTES = 0x14
 CMD_SET_PATTERN_LENGTH = 0x15
-CMD_RENAME_CHANNEL   = 0x16
-CMD_RENAME_PATTERN   = 0x17
-CMD_PING             = 0x18
-CMD_SET_MIXER_VOL    = 0x19
-CMD_SET_MIXER_PAN    = 0x1A
-CMD_ROUTE_TO_MIXER   = 0x1B
+CMD_RENAME_CHANNEL = 0x16
+CMD_RENAME_PATTERN = 0x17
+CMD_PING = 0x18
+CMD_SET_MIXER_VOL = 0x19
+CMD_SET_MIXER_PAN = 0x1A
+CMD_ROUTE_TO_MIXER = 0x1B
 CMD_QUERY_MIXER_STATE = 0x1C
-CMD_UNDO             = 0x1D
-CMD_REDO             = 0x1E
+CMD_UNDO = 0x1D
+CMD_REDO = 0x1E
 
-# FL Studio → Server responses  (0x10-0x1F reserved for responses)
-RESP_STATUS   = 0x10
+# Phase 4 Extensions
+CMD_SET_PLUGIN_PARAM = 0x20
+CMD_GET_PLUGIN_PARAM = 0x21
+CMD_SHOW_WINDOW = 0x22
+CMD_ADD_MARKER = 0x23
+RESP_PLUGIN_PARAM = 0x24
+CMD_GET_PEAKS = 0x25
+RESP_PEAKS = 0x26
+CMD_BROWSER_NAV = 0x27
+
+# Phase 6 Enhancements
+CMD_SET_GRID_BIT = 0x28
+CMD_MUTE_PLAYLIST_TRACK = 0x29
+CMD_SOLO_PLAYLIST_TRACK = 0x2A
+CMD_SET_TIME_SELECTION = 0x2B
+CMD_SET_CHANNEL_COLOR = 0x2C
+CMD_SET_PATTERN_COLOR = 0x2D
+
+# Phase 7 Enhancements
+CMD_SET_CHANNEL_NAME = 0x2E
+CMD_SET_CHANNEL_MIXER_TRACK = 0x2F
+CMD_UI_NAVIGATE = 0x30
+
+# FL Studio → Server responses  (0x10-0x1F, 0x24-0x2F reserved for responses)
+RESP_STATUS = 0x10
 RESP_CHANNELS = 0x11
 RESP_PATTERNS = 0x12
-RESP_NOTES    = 0x14
+RESP_NOTES = 0x14
 RESP_MIXER_STATE = 0x1C
-RESP_ACK      = 0x1F
+RESP_ACK = 0x1F
+RESP_PLUGIN_PARAM = 0x24
 
 # MMC device ID 0x7F = "all devices"
-_MMC_PLAY  = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x02, 0xF7])
-_MMC_STOP  = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x01, 0xF7])
+_MMC_PLAY = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x02, 0xF7])
+_MMC_STOP = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x01, 0xF7])
 
 
 def mmc_play() -> bytes:
@@ -151,13 +175,19 @@ def decode_notes(payload: list[int]) -> list[dict]:
         raise ValueError(f"Notes payload length {len(payload)} is not a multiple of 9")
     notes = []
     for i in range(0, len(payload), 9):
-        notes.append({
-            "pitch":          payload[i],
-            "velocity":       payload[i + 1],
-            "channel":        payload[i + 2],
-            "start_tick":     _decode_tick(payload[i+3], payload[i+4], payload[i+5]),
-            "duration_ticks": _decode_tick(payload[i+6], payload[i+7], payload[i+8]),
-        })
+        notes.append(
+            {
+                "pitch": payload[i],
+                "velocity": payload[i + 1],
+                "channel": payload[i + 2],
+                "start_tick": _decode_tick(
+                    payload[i + 3], payload[i + 4], payload[i + 5]
+                ),
+                "duration_ticks": _decode_tick(
+                    payload[i + 6], payload[i + 7], payload[i + 8]
+                ),
+            }
+        )
     return notes
 
 
@@ -185,6 +215,7 @@ def decode_sysex(raw: bytes) -> tuple[int, list[int]] | None:
 # ---------------------------------------------------------------------------
 # New query encoders
 # ---------------------------------------------------------------------------
+
 
 def encode_query_status() -> bytes:
     return _sysex(CMD_QUERY_STATUS, [])
@@ -216,6 +247,7 @@ def encode_select_pattern(pattern_idx: int) -> bytes:
 # Response decoders  (FL Studio → MCP server)
 # ---------------------------------------------------------------------------
 
+
 def decode_resp_status(payload: list[int]) -> dict:
     """Decode a RESP_STATUS payload.
 
@@ -224,18 +256,23 @@ def decode_resp_status(payload: list[int]) -> dict:
     if len(payload) < 5:
         raise ValueError(f"RESP_STATUS payload too short: {len(payload)} bytes")
     return {
-        "playing":       bool(payload[0]),
-        "bpm":           decode_tempo(payload[1:3]),
+        "playing": bool(payload[0]),
+        "bpm": decode_tempo(payload[1:3]),
         "pattern_index": payload[3],
         "channel_count": payload[4],
     }
 
 
-def encode_resp_status(playing: bool, bpm: int, pattern_index: int, channel_count: int) -> bytes:
+def encode_resp_status(
+    playing: bool, bpm: int, pattern_index: int, channel_count: int
+) -> bytes:
     """Build a RESP_STATUS message (used by FL Studio script to respond)."""
     bpm_hi = (bpm >> 7) & 0x7F
     bpm_lo = bpm & 0x7F
-    return _sysex(RESP_STATUS, [int(playing), bpm_hi, bpm_lo, pattern_index & 0x7F, channel_count & 0x7F])
+    return _sysex(
+        RESP_STATUS,
+        [int(playing), bpm_hi, bpm_lo, pattern_index & 0x7F, channel_count & 0x7F],
+    )
 
 
 def decode_resp_channels(payload: list[int]) -> list[str]:
@@ -274,6 +311,7 @@ def encode_resp_channels(names: list[str]) -> bytes:
 # Pattern list (mirrors channel encoding, different cmd/resp bytes)
 # ---------------------------------------------------------------------------
 
+
 def encode_query_patterns() -> bytes:
     return _sysex(CMD_QUERY_PATTERNS, [])
 
@@ -298,6 +336,7 @@ def encode_resp_patterns(names: list[str]) -> bytes:
 # Mute / Solo
 # ---------------------------------------------------------------------------
 
+
 def encode_mute_channel(channel_idx: int, muted: bool) -> bytes:
     if not 0 <= channel_idx <= 127:
         raise ValueError(f"channel_idx must be 0-127, got {channel_idx}")
@@ -313,6 +352,7 @@ def encode_solo_channel(channel_idx: int, soloed: bool) -> bytes:
 # ---------------------------------------------------------------------------
 # Clear pattern / channel pan
 # ---------------------------------------------------------------------------
+
 
 def encode_set_channel_pan(channel_idx: int, pan: int) -> bytes:
     """Encode a set-channel-pan command.
@@ -394,6 +434,7 @@ def encode_resp_notes(notes: list[dict]) -> bytes:
 # Panic helpers (pure MIDI CC — no SysEx, no FL Studio script needed)
 # ---------------------------------------------------------------------------
 
+
 def panic_messages() -> list[bytes]:
     """Return all-notes-off + all-sound-off CC messages for all 16 channels.
 
@@ -411,6 +452,7 @@ def panic_messages() -> list[bytes]:
 # ---------------------------------------------------------------------------
 # Mixer & Routing (Sprint 4)
 # ---------------------------------------------------------------------------
+
 
 def encode_set_mixer_vol(track_idx: int, volume: int) -> bytes:
     if not 0 <= track_idx <= 127:
@@ -442,9 +484,13 @@ def encode_query_mixer_state(start_track: int, end_track: int) -> bytes:
     if not 0 <= end_track <= 127:
         raise ValueError(f"end_track must be 0-127, got {end_track}")
     if start_track > end_track:
-        raise ValueError(f"start_track ({start_track}) cannot be greater than end_track ({end_track})")
+        raise ValueError(
+            f"start_track ({start_track}) cannot be greater than end_track ({end_track})"
+        )
     if end_track - start_track >= 32:
-        raise ValueError(f"Queried range exceeds maximum of 32 tracks: {end_track - start_track + 1}")
+        raise ValueError(
+            f"Queried range exceeds maximum of 32 tracks: {end_track - start_track + 1}"
+        )
     return _sysex(CMD_QUERY_MIXER_STATE, [start_track, end_track])
 
 
@@ -461,27 +507,21 @@ def decode_resp_mixer_state(payload: list[int]) -> dict:
         if i + 3 > len(payload):
             break
         vol = payload[i]
-        pan = payload[i+1]
-        name_len = payload[i+2]
+        pan = payload[i + 1]
+        name_len = payload[i + 2]
         i += 3
         if i + name_len > len(payload):
             break
         name_bytes = payload[i : i + name_len]
         i += name_len
         name = "".join(chr(b) for b in name_bytes)
-        tracks.append({
-            "volume": vol,
-            "pan": pan,
-            "name": name
-        })
-    return {
-        "start_track": start_track,
-        "end_track": end_track,
-        "tracks": tracks
-    }
+        tracks.append({"volume": vol, "pan": pan, "name": name})
+    return {"start_track": start_track, "end_track": end_track, "tracks": tracks}
 
 
-def encode_resp_mixer_state(start_track: int, end_track: int, tracks: list[dict]) -> bytes:
+def encode_resp_mixer_state(
+    start_track: int, end_track: int, tracks: list[dict]
+) -> bytes:
     payload: list[int] = [start_track, end_track, len(tracks)]
     for t in tracks:
         vol = int(t.get("volume", 0)) & 0x7F
@@ -517,3 +557,192 @@ def decode_resp_ack(payload: list[int]) -> int:
 
 def encode_resp_ack(cmd_byte: int) -> bytes:
     return _sysex(RESP_ACK, [cmd_byte & 0x7F])
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: Plugin Parameters, UI Windows, Markers
+# ---------------------------------------------------------------------------
+
+
+def encode_set_plugin_param(target_type: int, track_or_chan_idx: int, slot_idx: int, param_idx: int, value: float) -> bytes:
+    """Encode CMD_SET_PLUGIN_PARAM SysEx message.
+    
+    target_type: 0 for Mixer (Effect), 1 for Channel (Generator).
+    track_or_chan_idx: mixer track index (if 0) or channel index (if 1).
+    slot_idx: mixer slot index (0-9). Ignored if target_type is 1.
+    param_idx: The index of the parameter to set (0-4095).
+    value: float between 0.0 and 1.0. Encoded as 14-bit integer (0-16383).
+    """
+    if target_type not in (0, 1):
+        raise ValueError("target_type must be 0 (Mixer) or 1 (Channel)")
+    if not 0 <= param_idx <= 4095:
+        raise ValueError(f"param_idx must be 0-4095, got {param_idx}")
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(f"value must be 0.0-1.0, got {value}")
+        
+    val_int = int(round(value * 16383))
+    val_hi = (val_int >> 7) & 0x7F
+    val_lo = val_int & 0x7F
+    
+    param_hi = (param_idx >> 7) & 0x7F
+    param_lo = param_idx & 0x7F
+    
+    return _sysex(CMD_SET_PLUGIN_PARAM, [target_type, track_or_chan_idx & 0x7F, slot_idx & 0x7F, param_hi, param_lo, val_hi, val_lo])
+
+
+def encode_get_plugin_param(target_type: int, track_or_chan_idx: int, slot_idx: int, param_idx: int) -> bytes:
+    """Encode CMD_GET_PLUGIN_PARAM SysEx message."""
+    if target_type not in (0, 1):
+        raise ValueError("target_type must be 0 (Mixer) or 1 (Channel)")
+    if not 0 <= param_idx <= 4095:
+        raise ValueError(f"param_idx must be 0-4095, got {param_idx}")
+        
+    param_hi = (param_idx >> 7) & 0x7F
+    param_lo = param_idx & 0x7F
+    
+    return _sysex(CMD_GET_PLUGIN_PARAM, [target_type, track_or_chan_idx & 0x7F, slot_idx & 0x7F, param_hi, param_lo])
+
+
+def decode_resp_plugin_param(payload: list[int]) -> float:
+    """Decode a RESP_PLUGIN_PARAM payload (2 bytes: val_hi, val_lo)."""
+    if len(payload) < 2:
+        raise ValueError("RESP_PLUGIN_PARAM payload too short")
+    val_int = (payload[0] << 7) | payload[1]
+    return val_int / 16383.0
+
+
+def encode_resp_plugin_param(value: float) -> bytes:
+    val_int = int(round(value * 16383))
+    val_hi = (val_int >> 7) & 0x7F
+    val_lo = val_int & 0x7F
+    return _sysex(RESP_PLUGIN_PARAM, [val_hi, val_lo])
+
+
+def encode_show_window(window_index: int) -> bytes:
+    """Encode CMD_SHOW_WINDOW.
+    window_index maps to standard FL Studio ui constants (e.g. 0=Mixer, 1=Channel Rack, 2=Playlist, 3=Piano Roll, 4=Browser).
+    """
+    return _sysex(CMD_SHOW_WINDOW, [window_index & 0x7F])
+
+
+def encode_add_marker(name: str) -> bytes:
+    """Encode CMD_ADD_MARKER."""
+    safe = [ord(c) for c in name[:14] if ord(c) <= 127]
+    return _sysex(CMD_ADD_MARKER, [len(safe)] + safe)
+
+
+def encode_get_peaks(track_idx: int) -> bytes:
+    """Encode CMD_GET_PEAKS."""
+    return _sysex(CMD_GET_PEAKS, [track_idx & 0x7F])
+
+
+def decode_resp_peaks(payload: list[int]) -> tuple[float, float]:
+    """Decode a RESP_PEAKS payload (4 bytes: l_hi, l_lo, r_hi, r_lo)."""
+    if len(payload) < 4:
+        raise ValueError("RESP_PEAKS payload too short")
+    l_int = (payload[0] << 7) | payload[1]
+    r_int = (payload[2] << 7) | payload[3]
+    return l_int / 16383.0, r_int / 16383.0
+
+
+def encode_resp_peaks(l_peak: float, r_peak: float) -> bytes:
+    l_int = int(round(max(0.0, min(1.0, l_peak)) * 16383))
+    r_int = int(round(max(0.0, min(1.0, r_peak)) * 16383))
+    l_hi = (l_int >> 7) & 0x7F
+    l_lo = l_int & 0x7F
+    r_hi = (r_int >> 7) & 0x7F
+    r_lo = r_int & 0x7F
+    return _sysex(RESP_PEAKS, [l_hi, l_lo, r_hi, r_lo])
+
+
+def encode_browser_nav(action: int) -> bytes:
+    """Encode CMD_BROWSER_NAV.
+    action: 0=Up, 1=Down, 2=Left, 3=Right, 4=Enter
+    """
+    return _sysex(CMD_BROWSER_NAV, [action & 0x7F])
+
+
+def encode_set_grid_bit(channel_idx: int, step_idx: int, value: int) -> bytes:
+    if not 0 <= channel_idx <= 127:
+        raise ValueError("channel_idx out of range")
+    if not 0 <= step_idx <= 127:
+        raise ValueError("step_idx out of range")
+    return _sysex(CMD_SET_GRID_BIT, [channel_idx & 0x7F, step_idx & 0x7F, value & 0x7F])
+
+
+def encode_mute_playlist_track(track_idx: int, muted: bool) -> bytes:
+    if not 0 <= track_idx <= 127:
+        raise ValueError("track_idx out of range")
+    return _sysex(CMD_MUTE_PLAYLIST_TRACK, [track_idx & 0x7F, int(muted)])
+
+
+def encode_solo_playlist_track(track_idx: int, soloed: bool) -> bytes:
+    if not 0 <= track_idx <= 127:
+        raise ValueError("track_idx out of range")
+    return _sysex(CMD_SOLO_PLAYLIST_TRACK, [track_idx & 0x7F, int(soloed)])
+
+
+def encode_set_time_selection(start_bar: int, end_bar: int) -> bytes:
+    """Encode CMD_SET_TIME_SELECTION
+    start_bar and end_bar can be up to 999. Sent as high/low bytes.
+    """
+    sb_hi = (start_bar >> 7) & 0x7F
+    sb_lo = start_bar & 0x7F
+    eb_hi = (end_bar >> 7) & 0x7F
+    eb_lo = end_bar & 0x7F
+    return _sysex(CMD_SET_TIME_SELECTION, [sb_hi, sb_lo, eb_hi, eb_lo])
+
+
+# --- Phase 7 Functions ---
+
+def encode_set_channel_name(channel_index: int, name: str) -> bytes:
+    """Encode a SET_CHANNEL_NAME command.
+    Payload: [ch_hi, ch_lo, ...string bytes...]
+    """
+    ch_hi = (channel_index >> 7) & 0x7F
+    ch_lo = channel_index & 0x7F
+    
+    # Simple ASCII encoding, filtering non-7-bit characters for safety
+    name_bytes = [ord(c) if ord(c) < 128 else 63 for c in name]
+    return _sysex(CMD_SET_CHANNEL_NAME, [ch_hi, ch_lo] + name_bytes)
+
+
+def encode_set_channel_mixer_track(channel_index: int, track_index: int) -> bytes:
+    """Encode a SET_CHANNEL_MIXER_TRACK command."""
+    ch_hi = (channel_index >> 7) & 0x7F
+    ch_lo = channel_index & 0x7F
+    tr_hi = (track_index >> 7) & 0x7F
+    tr_lo = track_index & 0x7F
+    return _sysex(CMD_SET_CHANNEL_MIXER_TRACK, [ch_hi, ch_lo, tr_hi, tr_lo])
+
+
+def encode_ui_navigate(action_id: int) -> bytes:
+    """Encode a UI_NAVIGATE command."""
+    # action_id <= 127 is assumed
+    return _sysex(CMD_UI_NAVIGATE, [action_id & 0x7F])
+
+
+def encode_set_channel_color(channel_idx: int, r: int, g: int, b: int) -> bytes:
+    """Color RGB must be 0-255. Split into 4-bit nibbles for 7-bit SysEx compliance."""
+    if not 0 <= channel_idx <= 127:
+        raise ValueError("channel_idx out of range")
+    # Pack as: r_hi, r_lo, g_hi, g_lo, b_hi, b_lo
+    return _sysex(CMD_SET_CHANNEL_COLOR, [
+        channel_idx & 0x7F,
+        (r >> 4) & 0x0F, r & 0x0F,
+        (g >> 4) & 0x0F, g & 0x0F,
+        (b >> 4) & 0x0F, b & 0x0F
+    ])
+
+
+def encode_set_pattern_color(pattern_idx: int, r: int, g: int, b: int) -> bytes:
+    if not 0 <= pattern_idx <= 999:
+        raise ValueError("pattern_idx out of range")
+    pat_hi = (pattern_idx >> 7) & 0x7F
+    pat_lo = pattern_idx & 0x7F
+    return _sysex(CMD_SET_PATTERN_COLOR, [
+        pat_hi, pat_lo,
+        (r >> 4) & 0x0F, r & 0x0F,
+        (g >> 4) & 0x0F, g & 0x0F,
+        (b >> 4) & 0x0F, b & 0x0F
+    ])

@@ -9,7 +9,6 @@ from ..protocol import encode_tempo
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_set_tempo",
         annotations={
@@ -47,6 +46,7 @@ def register(mcp: FastMCP) -> None:
             return format_result(exc.to_dict())
         except ValueError as exc:
             from ..errors import ErrorCode
+
             return format_result(
                 FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
             )

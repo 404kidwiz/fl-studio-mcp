@@ -8,7 +8,6 @@ from ..models import ConnectInput, DisconnectInput, PingInput
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_connect",
         annotations={
@@ -56,6 +55,7 @@ def register(mcp: FastMCP) -> None:
             return format_result(exc.to_dict())
         except ValueError as exc:
             from ..errors import ErrorCode
+
             return format_result(
                 FLMCPError(ErrorCode.MIDI_PORT_NOT_FOUND, str(exc)).to_dict()
             )
@@ -125,12 +125,14 @@ def register(mcp: FastMCP) -> None:
 
         bridge = FLStudioBridge.get()
         if bridge.dry_run:
-            return format_result({
-                "dry_run": True,
-                "success": True,
-                "challenge": params.challenge,
-                "response_time_ms": 0.0,
-            })
+            return format_result(
+                {
+                    "dry_run": True,
+                    "success": True,
+                    "challenge": params.challenge,
+                    "response_time_ms": 0.0,
+                }
+            )
 
         try:
             start_time = time.monotonic()
@@ -143,7 +145,7 @@ def register(mcp: FastMCP) -> None:
                 raise FLMCPError(
                     ErrorCode.TIMEOUT,
                     f"Ping challenge {params.challenge} timed out after {params.timeout_ms}ms.",
-                    {"challenge": params.challenge, "timeout_ms": params.timeout_ms}
+                    {"challenge": params.challenge, "timeout_ms": params.timeout_ms},
                 )
 
             payload = pong.get("payload", [])
@@ -151,14 +153,16 @@ def register(mcp: FastMCP) -> None:
                 raise FLMCPError(
                     ErrorCode.UNKNOWN,
                     f"Ping challenge verification failed: expected {params.challenge}, got {payload}",
-                    {"expected": params.challenge, "got": payload}
+                    {"expected": params.challenge, "got": payload},
                 )
 
             elapsed = (time.monotonic() - start_time) * 1000.0
-            return format_result({
-                "success": True,
-                "challenge": params.challenge,
-                "response_time_ms": round(elapsed, 2),
-            })
+            return format_result(
+                {
+                    "success": True,
+                    "challenge": params.challenge,
+                    "response_time_ms": round(elapsed, 2),
+                }
+            )
         except FLMCPError as exc:
             return format_result(exc.to_dict())

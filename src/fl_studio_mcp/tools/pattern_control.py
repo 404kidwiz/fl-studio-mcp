@@ -28,7 +28,6 @@ from ..protocol import (
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_get_notes",
         annotations={
@@ -62,30 +61,61 @@ def register(mcp: FastMCP) -> None:
         """
         bridge = FLStudioBridge.get()
         try:
-            response = await bridge.query(encode_get_notes(), RESP_NOTES, params.timeout_ms)
+            response = await bridge.query(
+                encode_get_notes(), RESP_NOTES, params.timeout_ms
+            )
         except FLMCPError as exc:
             return format_result(exc.to_dict())
 
         if bridge.dry_run:
             mock = [
-                {"pitch": 60, "velocity": 100, "channel": 0, "start_tick": 0, "duration_ticks": 96},
-                {"pitch": 64, "velocity": 100, "channel": 0, "start_tick": 96, "duration_ticks": 96},
-                {"pitch": 67, "velocity": 100, "channel": 0, "start_tick": 192, "duration_ticks": 192},
+                {
+                    "pitch": 60,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 0,
+                    "duration_ticks": 96,
+                },
+                {
+                    "pitch": 64,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 96,
+                    "duration_ticks": 96,
+                },
+                {
+                    "pitch": 67,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 192,
+                    "duration_ticks": 192,
+                },
             ]
-            return format_result({"dry_run": True, "notes": mock, "count": len(mock), "source": "dry_run_preview"})
+            return format_result(
+                {
+                    "dry_run": True,
+                    "notes": mock,
+                    "count": len(mock),
+                    "source": "dry_run_preview",
+                }
+            )
 
         if response is None and not bridge.listening:
-            return format_result({
-                "error": ErrorCode.NOT_CONNECTED.value,
-                "hint": "No MIDI input port active. Reconnect with fl_connect to auto-start the listener."
-            })
+            return format_result(
+                {
+                    "error": ErrorCode.NOT_CONNECTED.value,
+                    "hint": "No MIDI input port active. Reconnect with fl_connect to auto-start the listener.",
+                }
+            )
 
         if response is None:
-            return format_result({
-                "error": "TIMEOUT",
-                "hint": "FL Studio did not respond. Ensure the FL MCP Bridge controller script is loaded in FL Studio → MIDI Settings and the IAC Driver input is enabled.",
-                "timeout_ms": params.timeout_ms
-            })
+            return format_result(
+                {
+                    "error": "TIMEOUT",
+                    "hint": "FL Studio did not respond. Ensure the FL MCP Bridge controller script is loaded in FL Studio → MIDI Settings and the IAC Driver input is enabled.",
+                    "timeout_ms": params.timeout_ms,
+                }
+            )
 
         try:
             notes = decode_resp_notes(response["payload"])
@@ -94,7 +124,9 @@ def register(mcp: FastMCP) -> None:
                 FLMCPError(ErrorCode.UNKNOWN, f"Bad notes response: {exc}").to_dict()
             )
 
-        return format_result({"notes": notes, "count": len(notes), "source": "fl_studio"})
+        return format_result(
+            {"notes": notes, "count": len(notes), "source": "fl_studio"}
+        )
 
     @mcp.tool(
         name="fl_get_context",
@@ -136,85 +168,115 @@ def register(mcp: FastMCP) -> None:
                 "playing": False,
                 "bpm": 120,
                 "pattern_index": 0,
-                "channel_count": 5
+                "channel_count": 5,
             }
             mock_channels = ["Kick", "Snare", "Hi-Hat", "Bass", "Synth Lead"]
             mock_notes = [
-                {"pitch": 60, "velocity": 100, "channel": 0, "start_tick": 0, "duration_ticks": 96}
+                {
+                    "pitch": 60,
+                    "velocity": 100,
+                    "channel": 0,
+                    "start_tick": 0,
+                    "duration_ticks": 96,
+                }
             ]
-            return format_result({
-                "dry_run": True,
-                "status": mock_status,
-                "channels": mock_channels,
-                "notes": mock_notes,
-                "source": "dry_run_preview",
-            })
+            return format_result(
+                {
+                    "dry_run": True,
+                    "status": mock_status,
+                    "channels": mock_channels,
+                    "notes": mock_notes,
+                    "source": "dry_run_preview",
+                }
+            )
 
         # 1. Query Status
         try:
-            status_resp = await bridge.query(encode_query_status(), RESP_STATUS, params.timeout_ms)
+            status_resp = await bridge.query(
+                encode_query_status(), RESP_STATUS, params.timeout_ms
+            )
         except FLMCPError as exc:
             return format_result(exc.to_dict())
 
         if status_resp is None and not bridge.listening:
-            return format_result({
-                "error": ErrorCode.NOT_CONNECTED.value,
-                "hint": "No MIDI input port active. Reconnect with fl_connect to auto-start the listener."
-            })
+            return format_result(
+                {
+                    "error": ErrorCode.NOT_CONNECTED.value,
+                    "hint": "No MIDI input port active. Reconnect with fl_connect to auto-start the listener.",
+                }
+            )
         if status_resp is None:
-            return format_result({
-                "error": "TIMEOUT",
-                "message": "Failed to get status context.",
-                "timeout_ms": params.timeout_ms
-            })
+            return format_result(
+                {
+                    "error": "TIMEOUT",
+                    "message": "Failed to get status context.",
+                    "timeout_ms": params.timeout_ms,
+                }
+            )
 
         try:
             status_data = decode_resp_status(status_resp["payload"])
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.UNKNOWN, f"Bad status context: {exc}").to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.UNKNOWN, f"Bad status context: {exc}").to_dict()
+            )
 
         # 2. Query Channels
         try:
-            channels_resp = await bridge.query(encode_query_channels(), RESP_CHANNELS, params.timeout_ms)
+            channels_resp = await bridge.query(
+                encode_query_channels(), RESP_CHANNELS, params.timeout_ms
+            )
         except FLMCPError as exc:
             return format_result(exc.to_dict())
 
         if channels_resp is None:
-            return format_result({
-                "error": "TIMEOUT",
-                "message": "Failed to get channel rack context.",
-                "timeout_ms": params.timeout_ms
-            })
+            return format_result(
+                {
+                    "error": "TIMEOUT",
+                    "message": "Failed to get channel rack context.",
+                    "timeout_ms": params.timeout_ms,
+                }
+            )
 
         try:
             channels_data = decode_resp_channels(channels_resp["payload"])
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.UNKNOWN, f"Bad channel context: {exc}").to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.UNKNOWN, f"Bad channel context: {exc}").to_dict()
+            )
 
         # 3. Query Notes
         try:
-            notes_resp = await bridge.query(encode_get_notes(), RESP_NOTES, params.timeout_ms)
+            notes_resp = await bridge.query(
+                encode_get_notes(), RESP_NOTES, params.timeout_ms
+            )
         except FLMCPError as exc:
             return format_result(exc.to_dict())
 
         if notes_resp is None:
-            return format_result({
-                "error": "TIMEOUT",
-                "message": "Failed to get active pattern notes context.",
-                "timeout_ms": params.timeout_ms
-            })
+            return format_result(
+                {
+                    "error": "TIMEOUT",
+                    "message": "Failed to get active pattern notes context.",
+                    "timeout_ms": params.timeout_ms,
+                }
+            )
 
         try:
             notes_data = decode_resp_notes(notes_resp["payload"])
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.UNKNOWN, f"Bad notes context: {exc}").to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.UNKNOWN, f"Bad notes context: {exc}").to_dict()
+            )
 
-        return format_result({
-            "status": status_data,
-            "channels": channels_data,
-            "notes": notes_data,
-            "source": "fl_studio"
-        })
+        return format_result(
+            {
+                "status": status_data,
+                "channels": channels_data,
+                "notes": notes_data,
+                "source": "fl_studio",
+            }
+        )
 
     @mcp.tool(
         name="fl_set_pattern_length",
@@ -249,7 +311,9 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         result["pattern_index"] = params.pattern_index
         result["length_beats"] = params.length_beats
@@ -289,7 +353,9 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         result["channel_index"] = params.channel_index
         result["name"] = params.name
@@ -329,7 +395,9 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         result["pattern_index"] = params.pattern_index
         result["name"] = params.name

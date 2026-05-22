@@ -4,12 +4,11 @@ from mcp.server.fastmcp import FastMCP
 
 from ..bridge import FLStudioBridge, format_result
 from ..errors import ErrorCode, FLMCPError
-from ..models import CreatePatternInput, SelectPatternInput
-from ..protocol import encode_new_pattern, encode_select_pattern
+from ..models import CreatePatternInput, SelectPatternInput, SetPatternColorInput
+from ..protocol import encode_new_pattern, encode_select_pattern, encode_set_pattern_color
 
 
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_create_pattern",
         annotations={
@@ -82,8 +81,44 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         result["pattern_index"] = params.pattern_index
         result["command"] = "SELECT_PATTERN"
+        return format_result(result)
+
+
+    @mcp.tool(
+        name="fl_set_pattern_color",
+        annotations={
+            "title": "Set Pattern Color",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def fl_set_pattern_color(params: SetPatternColorInput) -> str:
+        """Set the display color of a pattern in the playlist and picker.
+        
+        Args:
+            params (SetPatternColorInput):
+                - pattern_index (int): Pattern index (1-999).
+                - r (int 0-255): Red component.
+                - g (int 0-255): Green component.
+                - b (int 0-255): Blue component.
+        """
+        bridge = FLStudioBridge.get()
+        try:
+            sysex = encode_set_pattern_color(params.pattern_index, params.r, params.g, params.b)
+            result = bridge.send_raw(sysex)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+        except ValueError as exc:
+            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            
+        result["pattern_index"] = params.pattern_index
+        result["color"] = [params.r, params.g, params.b]
         return format_result(result)

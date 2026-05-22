@@ -1,6 +1,5 @@
 """Tools: fl_panic, fl_mute_channel, fl_solo_channel, fl_set_mixer_volume, fl_set_mixer_pan, fl_route_to_mixer, fl_get_mixer_state."""
 
-import mido
 from mcp.server.fastmcp import FastMCP
 
 from ..bridge import FLStudioBridge, format_result
@@ -13,6 +12,8 @@ from ..models import (
     SetMixerPanInput,
     RouteToMixerInput,
     GetMixerStateInput,
+    GetTrackPeaksInput,
+    AutoMixInput,
 )
 from ..protocol import (
     encode_mute_channel,
@@ -40,9 +41,7 @@ _TIMEOUT_HINT = (
 )
 
 
-
 def register(mcp: FastMCP) -> None:
-
     @mcp.tool(
         name="fl_panic",
         annotations={
@@ -79,12 +78,14 @@ def register(mcp: FastMCP) -> None:
 
         if bridge.dry_run:
             bridge._require_connection()  # still check connected in dry-run
-            return format_result({
-                "dry_run": True,
-                "messages_sent": len(msgs),
-                "channels_cleared": 16,
-                "note": "Would send All Notes Off + All Sound Off + Reset All Controllers × 16 channels",
-            })
+            return format_result(
+                {
+                    "dry_run": True,
+                    "messages_sent": len(msgs),
+                    "channels_cleared": 16,
+                    "note": "Would send All Notes Off + All Sound Off + Reset All Controllers × 16 channels",
+                }
+            )
 
         try:
             for raw in msgs:
@@ -92,11 +93,13 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
 
-        return format_result({
-            "sent": True,
-            "messages_sent": len(msgs),
-            "channels_cleared": 16,
-        })
+        return format_result(
+            {
+                "sent": True,
+                "messages_sent": len(msgs),
+                "channels_cleared": 16,
+            }
+        )
 
     @mcp.tool(
         name="fl_mute_channel",
@@ -138,7 +141,9 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         result["channel_index"] = params.channel_index
         result["muted"] = params.muted
@@ -185,7 +190,9 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         result["channel_index"] = params.channel_index
         result["soloed"] = params.soloed
@@ -222,7 +229,9 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         result["track_index"] = params.track_index
         result["volume"] = params.volume
@@ -259,7 +268,9 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         result["track_index"] = params.track_index
         result["pan"] = params.pan
@@ -296,7 +307,9 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         result["channel_index"] = params.channel_index
         result["track_index"] = params.track_index
@@ -334,46 +347,227 @@ def register(mcp: FastMCP) -> None:
         except FLMCPError as exc:
             return format_result(exc.to_dict())
         except ValueError as exc:
-            return format_result(FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict())
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
 
         if bridge.dry_run:
-            return format_result({
-                "dry_run": True,
-                "start_track": params.start_track,
-                "end_track": params.end_track,
-                "tracks": [
-                    {
-                        "volume": 100,
-                        "pan": 64,
-                        "name": "Master" if i == 0 else f"Insert {i}"
-                    }
-                    for i in range(params.start_track, params.end_track + 1)
-                ],
-                "source": "dry_run_preview",
-            })
+            return format_result(
+                {
+                    "dry_run": True,
+                    "start_track": params.start_track,
+                    "end_track": params.end_track,
+                    "tracks": [
+                        {
+                            "volume": 100,
+                            "pan": 64,
+                            "name": "Master" if i == 0 else f"Insert {i}",
+                        }
+                        for i in range(params.start_track, params.end_track + 1)
+                    ],
+                    "source": "dry_run_preview",
+                }
+            )
 
         if response is None and not bridge.listening:
-            return format_result({
-                "error": ErrorCode.NOT_CONNECTED.value,
-                "message": "No MIDI input listener active.",
-                "hint": _NO_LISTENER_HINT,
-            })
+            return format_result(
+                {
+                    "error": ErrorCode.NOT_CONNECTED.value,
+                    "message": "No MIDI input listener active.",
+                    "hint": _NO_LISTENER_HINT,
+                }
+            )
 
         if response is None:
-            return format_result({
-                "error": "TIMEOUT",
-                "message": "FL Studio did not respond.",
-                "hint": _TIMEOUT_HINT,
-                "timeout_ms": params.timeout_ms,
-            })
+            return format_result(
+                {
+                    "error": "TIMEOUT",
+                    "message": "FL Studio did not respond.",
+                    "hint": _TIMEOUT_HINT,
+                    "timeout_ms": params.timeout_ms,
+                }
+            )
 
         try:
             state = decode_resp_mixer_state(response["payload"])
         except ValueError as exc:
             return format_result(
-                FLMCPError(ErrorCode.UNKNOWN, f"Bad mixer state response: {exc}").to_dict()
+                FLMCPError(
+                    ErrorCode.UNKNOWN, f"Bad mixer state response: {exc}"
+                ).to_dict()
             )
 
         state["source"] = "fl_studio"
         return format_result(state)
 
+    @mcp.tool(
+        name="fl_get_track_peaks",
+        annotations={
+            "title": "Get Mixer Track Peaks",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def fl_get_track_peaks(params: GetTrackPeaksInput) -> str:
+        """Get the current Left and Right audio peak levels for a mixer track.
+
+        Args:
+            params (GetTrackPeaksInput):
+                - track_index (int): The mixer track index (0=Master, 1-125=Inserts).
+
+        Returns:
+            str: JSON with 'l_peak' and 'r_peak' as floats (0.0 to 1.0).
+        """
+        try:
+            from ..protocol import CMD_GET_PEAKS, decode_resp_peaks, encode_get_peaks, RESP_PEAKS
+        except ImportError:
+            return format_result({"error": "Protocol extensions not found"})
+        
+        bridge = FLStudioBridge.get()
+        try:
+            sysex = encode_get_peaks(params.track_index)
+            response = await bridge.query(sysex, RESP_PEAKS, timeout_ms=2000)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+            
+        if bridge.dry_run:
+            return format_result({"dry_run": True, "l_peak": 0.5, "r_peak": 0.5})
+
+        if response is None:
+            return format_result({"error": "TIMEOUT", "message": "No response from FL Studio."})
+
+        try:
+            l_peak, r_peak = decode_resp_peaks(response["payload"])
+            return format_result({
+                "track_index": params.track_index,
+                "l_peak": l_peak,
+                "r_peak": r_peak
+            })
+        except Exception as exc:
+            return format_result({"error": str(exc)})
+
+    @mcp.tool(
+        name="fl_auto_mix",
+        annotations={
+            "title": "Dynamic Mixer Assistant",
+            "readOnlyHint": False,
+            "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
+        },
+    )
+    async def fl_auto_mix(params: AutoMixInput) -> str:
+        """Perform automated gain staging/level balancing on selected mixer tracks.
+
+        Queries the peak level of each specified track using fl_get_track_peaks,
+        converts the linear amplitude to decibels (dB), calculates required fader
+        adjustment to reach the target dB level (incorporating headroom), and
+        sends corrective MIDI volume commands to FL Studio.
+
+        Excellent for dynamic studio mixing sessions to establish initial gain structure.
+
+        Args:
+            params (AutoMixInput):
+                - tracks (list[int]): Mixer tracks to balance (e.g. [1, 2, 3]).
+                - target_db (float): Target peak level in dB (default -12.0).
+                - headroom_db (float): Scaled headroom margin (default -3.0).
+
+        Returns:
+            str: JSON log showing initial levels, dB differences, fader calculations, and actions taken.
+        """
+        import math
+        from ..protocol import CMD_GET_PEAKS, decode_resp_peaks, encode_get_peaks, RESP_PEAKS
+
+        bridge = FLStudioBridge.get()
+        results = []
+        overall_success = True
+
+        effective_target = params.target_db + params.headroom_db
+
+        for track in params.tracks:
+            # Step 1: Read peaks
+            l_peak, r_peak = 0.0, 0.0
+            peak_success = False
+            
+            if bridge.dry_run:
+                import random
+                base_peak = 0.7 if track in [1, 2, 3] else 0.4
+                l_peak = base_peak + random.uniform(-0.15, 0.15)
+                r_peak = base_peak + random.uniform(-0.15, 0.15)
+                peak_success = True
+            else:
+                try:
+                    sysex = encode_get_peaks(track)
+                    response = await bridge.query(sysex, RESP_PEAKS, timeout_ms=1000)
+                    if response is not None:
+                        l_peak, r_peak = decode_resp_peaks(response["payload"])
+                        peak_success = True
+                except Exception as e:
+                    logger.warning(f"Could not read peak for track {track}: {e}")
+
+            if not peak_success:
+                results.append({
+                    "track_index": track,
+                    "success": False,
+                    "error": "Could not retrieve peak level metering from FL Studio."
+                })
+                continue
+
+            max_peak = max(l_peak, r_peak)
+            
+            # Step 2: Convert linear peak to dB
+            if max_peak > 0.0001:
+                current_db = 20 * math.log10(max_peak)
+            else:
+                current_db = -96.0
+
+            # Step 3: Calculate gain delta
+            gain_delta_db = effective_target - current_db
+
+            # Read current fader volume or default to 100.
+            current_vol = 100
+            if not bridge.dry_run:
+                try:
+                    state_sysex = encode_query_mixer_state(track, track)
+                    resp = await bridge.query(state_sysex, RESP_MIXER_STATE, timeout_ms=500)
+                    if resp:
+                        state_data = decode_resp_mixer_state(resp["payload"])
+                        if state_data and "tracks" in state_data and len(state_data["tracks"]) > 0:
+                            current_vol = state_data["tracks"][0].get("volume", 100)
+                except Exception:
+                    pass
+
+            db_per_step = 0.25
+            vol_delta = int(round(gain_delta_db / db_per_step))
+            target_vol = max(0, min(127, current_vol + vol_delta))
+
+            # Step 4: Apply volume fader change in FL Studio
+            volume_sent = False
+            try:
+                vol_sysex = encode_set_mixer_vol(track, target_vol)
+                bridge.send_raw(vol_sysex)
+                volume_sent = True
+            except Exception as e:
+                logger.error(f"Failed to set volume for track {track}: {e}")
+                overall_success = False
+
+            results.append({
+                "track_index": track,
+                "success": volume_sent,
+                "input_peaks": {"L": round(l_peak, 3), "R": round(r_peak, 3)},
+                "current_peak_db": round(current_db, 2),
+                "target_peak_db": round(effective_target, 2),
+                "gain_adjustment_db": round(gain_delta_db, 2),
+                "previous_fader_vol": current_vol,
+                "new_fader_vol": target_vol,
+            })
+
+        return format_result({
+            "success": overall_success,
+            "tracks_processed": results,
+            "target_db": params.target_db,
+            "headroom_db": params.headroom_db,
+            "effective_target_db": effective_target,
+        })

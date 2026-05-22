@@ -37,6 +37,7 @@ from fl_studio_mcp.protocol import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def parse(result: str) -> dict:
     return json.loads(result)
 
@@ -50,6 +51,7 @@ def _tool(module_name: str, tool_name: str):
     """Import a tool module and return its registered function."""
     import importlib
     from mcp.server.fastmcp import FastMCP
+
     mod = importlib.import_module(f"fl_studio_mcp.tools.{module_name}")
     _mcp = FastMCP("test")
     mod.register(_mcp)
@@ -59,6 +61,7 @@ def _tool(module_name: str, tool_name: str):
 # ---------------------------------------------------------------------------
 # Protocol: new encoders
 # ---------------------------------------------------------------------------
+
 
 class TestNewProtocolEncoders:
     def test_query_status_framing(self):
@@ -97,16 +100,25 @@ class TestNewProtocolEncoders:
 
 class TestResponseEncoderDecoder:
     def test_resp_status_roundtrip(self):
-        raw = encode_resp_status(playing=True, bpm=140, pattern_index=2, channel_count=8)
+        raw = encode_resp_status(
+            playing=True, bpm=140, pattern_index=2, channel_count=8
+        )
         from fl_studio_mcp.protocol import decode_sysex
+
         cmd, payload = decode_sysex(raw)
         assert cmd == RESP_STATUS
         result = decode_resp_status(payload)
-        assert result == {"playing": True, "bpm": 140, "pattern_index": 2, "channel_count": 8}
+        assert result == {
+            "playing": True,
+            "bpm": 140,
+            "pattern_index": 2,
+            "channel_count": 8,
+        }
 
     def test_resp_status_not_playing(self):
         raw = encode_resp_status(False, 120, 0, 0)
         from fl_studio_mcp.protocol import decode_sysex
+
         _, payload = decode_sysex(raw)
         result = decode_resp_status(payload)
         assert result["playing"] is False
@@ -116,6 +128,7 @@ class TestResponseEncoderDecoder:
         names = ["Kick", "Snare", "Hi-Hat", "Bass", "Lead"]
         raw = encode_resp_channels(names)
         from fl_studio_mcp.protocol import decode_sysex
+
         cmd, payload = decode_sysex(raw)
         assert cmd == RESP_CHANNELS
         decoded = decode_resp_channels(payload)
@@ -124,6 +137,7 @@ class TestResponseEncoderDecoder:
     def test_resp_channels_empty(self):
         raw = encode_resp_channels([])
         from fl_studio_mcp.protocol import decode_sysex
+
         _, payload = decode_sysex(raw)
         assert decode_resp_channels(payload) == []
 
@@ -131,6 +145,7 @@ class TestResponseEncoderDecoder:
         long_name = "A" * 20
         raw = encode_resp_channels([long_name])
         from fl_studio_mcp.protocol import decode_sysex
+
         _, payload = decode_sysex(raw)
         decoded = decode_resp_channels(payload)
         assert len(decoded[0]) <= 14
@@ -144,9 +159,12 @@ class TestResponseEncoderDecoder:
 # Bridge: queue injection and query timeout
 # ---------------------------------------------------------------------------
 
+
 class TestBridgeQuery:
     async def test_dry_run_query_returns_none(self, dry_bridge):
-        result = await dry_bridge.query(encode_query_status(), RESP_STATUS, timeout_ms=200)
+        result = await dry_bridge.query(
+            encode_query_status(), RESP_STATUS, timeout_ms=200
+        )
         assert result is None  # dry-run always returns None
 
     async def test_no_listener_property(self, dry_bridge):
@@ -155,7 +173,9 @@ class TestBridgeQuery:
 
     async def test_dry_run_connected_but_no_listener(self, dry_bridge):
         # query() returns None in dry-run regardless of listener state
-        result = await dry_bridge.query(encode_query_status(), RESP_STATUS, timeout_ms=100)
+        result = await dry_bridge.query(
+            encode_query_status(), RESP_STATUS, timeout_ms=100
+        )
         assert result is None
 
     async def test_injected_response_received(self, dry_bridge):
@@ -163,6 +183,7 @@ class TestBridgeQuery:
         # Build a valid status payload
         status_raw = encode_resp_status(True, 128, 1, 4)
         from fl_studio_mcp.protocol import decode_sysex
+
         _, payload = decode_sysex(status_raw)
 
         # Inject into queue — simulates FL Studio sending back
@@ -170,6 +191,7 @@ class TestBridgeQuery:
 
         # Manually poll without sending (simulates post-send wait)
         import time
+
         deadline = time.monotonic() + 1.0
         found = None
         while time.monotonic() < deadline:
@@ -191,6 +213,7 @@ class TestBridgeQuery:
 # Tool: fl_get_status
 # ---------------------------------------------------------------------------
 
+
 class TestGetStatus:
     async def test_dry_run_returns_preview(self, dry_bridge):
         fn = _tool("status", "fl_get_status")
@@ -210,6 +233,7 @@ class TestGetStatus:
 # Tool: fl_list_channels
 # ---------------------------------------------------------------------------
 
+
 class TestListChannels:
     async def test_dry_run_returns_mock(self, dry_bridge):
         fn = _tool("channels", "fl_list_channels")
@@ -228,6 +252,7 @@ class TestListChannels:
 # ---------------------------------------------------------------------------
 # Tool: fl_set_channel_volume
 # ---------------------------------------------------------------------------
+
 
 class TestSetChannelVolume:
     async def test_dry_run(self, dry_bridge):
@@ -253,6 +278,7 @@ class TestSetChannelVolume:
 # Tool: fl_create_pattern
 # ---------------------------------------------------------------------------
 
+
 class TestCreatePattern:
     async def test_dry_run(self, dry_bridge):
         fn = _tool("patterns", "fl_create_pattern")
@@ -274,6 +300,7 @@ class TestCreatePattern:
 # ---------------------------------------------------------------------------
 # Tool: fl_select_pattern
 # ---------------------------------------------------------------------------
+
 
 class TestSelectPattern:
     async def test_dry_run(self, dry_bridge):

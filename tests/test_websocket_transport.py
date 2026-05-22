@@ -1,9 +1,8 @@
 import asyncio
-import json
 import pytest
 import websockets
 from fl_studio_mcp.bridge import FLStudioBridge
-from fl_studio_mcp.transports.websocket import WebSocketMIDITransport, parse_ws_url
+from fl_studio_mcp.transports.websocket import parse_ws_url
 
 
 def test_parse_ws_url():
@@ -16,7 +15,7 @@ def test_parse_ws_url():
 @pytest.mark.asyncio
 async def test_websocket_transport_communication():
     bridge = FLStudioBridge.get()
-    
+
     # Connect using a specific local port
     port_name = "ws://127.0.0.1:8799"
     opened = bridge.connect(port_name)
@@ -30,10 +29,10 @@ async def test_websocket_transport_communication():
         # Let's send raw SysEx: F0 7F 7F 06 01 F7 (MIDI STOP)
         # Note: raw SysEx bytes must start with F0 and end with F7
         raw_msg = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x01, 0xF7])
-        
+
         # Trigger sending bytes
         bridge.send_raw(raw_msg)
-        
+
         # Client should receive the raw bytes
         received = await asyncio.wait_for(client.recv(), timeout=2.0)
         assert received == raw_msg
@@ -43,7 +42,7 @@ async def test_websocket_transport_communication():
         # format: F0 7D <cmd> [payload] F7
         client_msg = bytes([0xF0, 0x7D, 0x01, 0x02, 0xF7])
         await client.send(client_msg)
-        
+
         # The bridge's input callback should process this message and put it into response_queue
         # Wait for it to appear in response_queue
         deadline = asyncio.get_event_loop().time() + 2.0
@@ -58,8 +57,10 @@ async def test_websocket_transport_communication():
                 found = True
                 break
             await asyncio.sleep(0.05)
-        
-        assert found, "Client message was not received by FLStudioBridge response queue."
+
+        assert (
+            found
+        ), "Client message was not received by FLStudioBridge response queue."
 
     # Disconnect the bridge
     bridge.disconnect()

@@ -18,7 +18,7 @@ from .base import MIDITransport
 
 def parse_ws_url(url: str) -> tuple[str, int]:
     """Parse a websocket URL into host and port.
-    
+
     Examples:
         "ws://127.0.0.1:8765" -> ("127.0.0.1", 8765)
         "ws://localhost" -> ("localhost", 8765)
@@ -138,14 +138,17 @@ class WebSocketMIDITransport(MIDITransport):
             name="WebSocketMIDITransportServer",
         )
         self._server_thread.start()
-        
+
         # Wait up to 5 seconds for the server to start up
         if not self._server_ready.wait(timeout=5.0):
             self._stop_server()
-            raise RuntimeError(f"WebSocket server failed to start on {host}:{port} within 5 seconds.")
+            raise RuntimeError(
+                f"WebSocket server failed to start on {host}:{port} within 5 seconds."
+            )
 
     def _run_server(self) -> None:
         import websockets
+
         asyncio.set_event_loop(self._loop)
 
         async def handler(websocket):
@@ -156,12 +159,20 @@ class WebSocketMIDITransport(MIDITransport):
                         self._handle_client_message(message)
                     except Exception as e:
                         import sys
-                        print(f"[FL STUDIO MCP] Exception in _handle_client_message: {e}", file=sys.stderr)
+
+                        print(
+                            f"[FL STUDIO MCP] Exception in _handle_client_message: {e}",
+                            file=sys.stderr,
+                        )
             except websockets.exceptions.ConnectionClosed:
                 pass
             except Exception as e:
                 import sys
-                print(f"[FL STUDIO MCP] Exception in websocket handler: {e}", file=sys.stderr)
+
+                print(
+                    f"[FL STUDIO MCP] Exception in websocket handler: {e}",
+                    file=sys.stderr,
+                )
             finally:
                 self._clients.discard(websocket)
 
@@ -173,7 +184,7 @@ class WebSocketMIDITransport(MIDITransport):
                 raise exc
 
             self._server_ready.set()
-            
+
             # Keep loop active
             while True:
                 await asyncio.sleep(3600)
@@ -216,17 +227,23 @@ class WebSocketMIDITransport(MIDITransport):
                 self._input_callback(msg)
             except Exception as e:
                 import sys
-                print(f"[FL STUDIO MCP] Exception invoking input callback: {e}", file=sys.stderr)
+
+                print(
+                    f"[FL STUDIO MCP] Exception invoking input callback: {e}",
+                    file=sys.stderr,
+                )
 
     def send_bytes(self, raw_bytes: bytes | list[int]) -> None:
-        actual_bytes = bytes(raw_bytes) if not isinstance(raw_bytes, bytes) else raw_bytes
+        actual_bytes = (
+            bytes(raw_bytes) if not isinstance(raw_bytes, bytes) else raw_bytes
+        )
         if self._loop and self._loop.is_running():
             asyncio.run_coroutine_threadsafe(self._broadcast(actual_bytes), self._loop)
 
     async def _broadcast(self, raw_bytes: bytes) -> None:
         if not self._clients:
             return
-        
+
         # Broadcast to all connected clients
         # Support sending binary bytes
         tasks = []
@@ -243,6 +260,7 @@ class WebSocketMIDITransport(MIDITransport):
 
     def _stop_server(self) -> None:
         if self._loop and self._loop.is_running():
+
             async def shutdown():
                 if self._server:
                     self._server.close()
@@ -252,13 +270,13 @@ class WebSocketMIDITransport(MIDITransport):
                         await client.close()
                     except Exception:
                         pass
-            
+
             future = asyncio.run_coroutine_threadsafe(shutdown(), self._loop)
             try:
                 future.result(timeout=2.0)
             except Exception:
                 pass
-            
+
             self._loop.call_soon_threadsafe(self._loop.stop)
 
         if self._server_thread:

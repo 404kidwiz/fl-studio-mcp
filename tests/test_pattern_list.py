@@ -6,7 +6,6 @@ Bidirectional tests use mock queue injection to simulate FL Studio responses.
 
 import json
 
-import pytest
 
 from fl_studio_mcp.bridge import FLStudioBridge
 from fl_studio_mcp.models import ListPatternsInput
@@ -22,6 +21,7 @@ from fl_studio_mcp.protocol import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def parse(result: str) -> dict:
     return json.loads(result)
 
@@ -33,6 +33,7 @@ def _inject_response(bridge: FLStudioBridge, cmd: int, payload: list) -> None:
 def _tool(tool_name: str):
     import importlib
     from mcp.server.fastmcp import FastMCP
+
     mod = importlib.import_module("fl_studio_mcp.tools.pattern_list")
     _mcp = FastMCP("test")
     mod.register(_mcp)
@@ -43,6 +44,7 @@ def _tool(tool_name: str):
 # Protocol: encode_query_patterns / encode_resp_patterns / decode_resp_patterns
 # ---------------------------------------------------------------------------
 
+
 class TestPatternProtocol:
     def test_query_patterns_framing(self):
         raw = encode_query_patterns()
@@ -52,6 +54,7 @@ class TestPatternProtocol:
         names = ["Pattern 1", "Verse", "Chorus", "Bridge"]
         raw = encode_resp_patterns(names)
         from fl_studio_mcp.protocol import decode_sysex
+
         cmd, payload = decode_sysex(raw)
         assert cmd == RESP_PATTERNS
         decoded = decode_resp_patterns(payload)
@@ -60,6 +63,7 @@ class TestPatternProtocol:
     def test_resp_patterns_empty(self):
         raw = encode_resp_patterns([])
         from fl_studio_mcp.protocol import decode_sysex
+
         _, payload = decode_sysex(raw)
         assert decode_resp_patterns(payload) == []
 
@@ -67,6 +71,7 @@ class TestPatternProtocol:
         long_name = "B" * 20
         raw = encode_resp_patterns([long_name])
         from fl_studio_mcp.protocol import decode_sysex
+
         _, payload = decode_sysex(raw)
         decoded = decode_resp_patterns(payload)
         assert len(decoded[0]) <= 14
@@ -80,6 +85,7 @@ class TestPatternProtocol:
         names = [f"Pat{i}" for i in range(200)]
         raw = encode_resp_patterns(names)
         from fl_studio_mcp.protocol import decode_sysex
+
         _, payload = decode_sysex(raw)
         decoded = decode_resp_patterns(payload)
         assert len(decoded) <= 127
@@ -92,6 +98,7 @@ class TestPatternProtocol:
 # ---------------------------------------------------------------------------
 # Tool: fl_list_patterns
 # ---------------------------------------------------------------------------
+
 
 class TestFlListPatterns:
     async def test_dry_run_returns_mock(self, dry_bridge):
@@ -125,6 +132,7 @@ class TestFlListPatterns:
         names = ["Intro", "Verse", "Chorus"]
         raw = encode_resp_patterns(names)
         from fl_studio_mcp.protocol import decode_sysex
+
         _, payload = decode_sysex(raw)
 
         _inject_response(dry_bridge, RESP_PATTERNS, payload)

@@ -3,13 +3,12 @@
 Includes protocol roundtrips, MCP tool behaviors, and Click CLI commands in dry-run mode.
 """
 
-import asyncio
 import json
 import pytest
 from click.testing import CliRunner
 
 from fl_studio_mcp.bridge import FLStudioBridge
-from fl_studio_mcp.cli import main, get_config_path
+from fl_studio_mcp.cli import main
 from fl_studio_mcp.models import (
     GetNotesInput,
     GetContextInput,
@@ -36,6 +35,7 @@ from fl_studio_mcp.protocol import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def parse(result: str) -> dict:
     return json.loads(result)
 
@@ -49,6 +49,7 @@ def _tool(tool_name: str):
     """Import the pattern_control tool module and return its registered function."""
     from mcp.server.fastmcp import FastMCP
     from fl_studio_mcp.tools import pattern_control
+
     _mcp = FastMCP("test")
     pattern_control.register(_mcp)
     return {t.name: t for t in _mcp._tool_manager.list_tools()}[tool_name].fn
@@ -64,6 +65,7 @@ def mock_home(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # 1. Protocol Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSprint3Protocol:
     def test_encode_get_notes(self):
@@ -127,8 +129,20 @@ class TestSprint3Protocol:
 
     def test_resp_notes_roundtrip(self):
         notes = [
-            {"pitch": 60, "velocity": 100, "channel": 0, "start_tick": 0, "duration_ticks": 96},
-            {"pitch": 64, "velocity": 90, "channel": 1, "start_tick": 96, "duration_ticks": 192},
+            {
+                "pitch": 60,
+                "velocity": 100,
+                "channel": 0,
+                "start_tick": 0,
+                "duration_ticks": 96,
+            },
+            {
+                "pitch": 64,
+                "velocity": 90,
+                "channel": 1,
+                "start_tick": 96,
+                "duration_ticks": 192,
+            },
         ]
         raw = encode_resp_notes(notes)
         cmd, payload = decode_sysex(raw)
@@ -140,6 +154,7 @@ class TestSprint3Protocol:
 # ---------------------------------------------------------------------------
 # 2. MCP Tool Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSprint3Tools:
     async def test_fl_get_notes_dry_run(self, dry_bridge):
@@ -157,6 +172,7 @@ class TestSprint3Tools:
     async def test_fl_get_notes_live_timeout(self, dry_bridge):
         # temporarily make bridge look not dry-run to trigger live query path
         import unittest.mock
+
         dry_bridge._dry_run = False
         dry_bridge._input_port = unittest.mock.Mock()
         dry_bridge._output_port = unittest.mock.Mock()
@@ -170,19 +186,29 @@ class TestSprint3Tools:
 
     async def test_fl_get_notes_live_success(self, dry_bridge):
         import unittest.mock
+
         dry_bridge._dry_run = False
         dry_bridge._input_port = unittest.mock.Mock()
         dry_bridge._output_port = unittest.mock.Mock()
-        
+
         # Prepare response
-        mock_notes = [{"pitch": 60, "velocity": 100, "channel": 0, "start_tick": 0, "duration_ticks": 96}]
+        mock_notes = [
+            {
+                "pitch": 60,
+                "velocity": 100,
+                "channel": 0,
+                "start_tick": 0,
+                "duration_ticks": 96,
+            }
+        ]
         raw = encode_resp_notes(mock_notes)
         _, payload = decode_sysex(raw)
-        
+
         def mock_send(msg):
             cmd, _ = decode_sysex(msg.bytes())
             if cmd == 0x14:  # CMD_GET_NOTES
                 _inject_response(dry_bridge, RESP_NOTES, payload)
+
         dry_bridge._output_port.send = mock_send
 
         fn = _tool("fl_get_notes")
@@ -203,6 +229,7 @@ class TestSprint3Tools:
 
     async def test_fl_get_context_live_success(self, dry_bridge):
         import unittest.mock
+
         dry_bridge._dry_run = False
         dry_bridge._input_port = unittest.mock.Mock()
         dry_bridge._output_port = unittest.mock.Mock()
@@ -227,6 +254,7 @@ class TestSprint3Tools:
                 _inject_response(dry_bridge, RESP_CHANNELS, channels_payload)
             elif cmd == 0x14:  # CMD_GET_NOTES
                 _inject_response(dry_bridge, RESP_NOTES, notes_payload)
+
         dry_bridge._output_port.send = mock_send
 
         fn = _tool("fl_get_context")
@@ -235,14 +263,16 @@ class TestSprint3Tools:
         assert result["channels"] == ["Kick", "Snare"]
         assert result["notes"] == []
         assert result["source"] == "fl_studio"
-        
+
         dry_bridge._dry_run = True
         dry_bridge._input_port = None
         dry_bridge._output_port = None
 
     async def test_fl_set_pattern_length(self, dry_bridge):
         fn = _tool("fl_set_pattern_length")
-        result = parse(await fn(SetPatternLengthInput(pattern_index=1, length_beats=16)))
+        result = parse(
+            await fn(SetPatternLengthInput(pattern_index=1, length_beats=16))
+        )
         assert result["dry_run"] is True
         assert result["pattern_index"] == 1
         assert result["length_beats"] == 16
@@ -270,6 +300,7 @@ class TestSprint3Tools:
 # ---------------------------------------------------------------------------
 # 3. CLI Command Tests
 # ---------------------------------------------------------------------------
+
 
 class TestSprint3CLI:
     def test_cli_patterns_notes_dry_run(self, mock_home):

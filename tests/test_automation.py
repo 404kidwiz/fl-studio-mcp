@@ -1,5 +1,4 @@
 import os
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
@@ -11,11 +10,11 @@ from fl_studio_mcp.automation.windows import WindowsAutomation
 from fl_studio_mcp.tools.vst_scanner import (
     get_fl_user_data_path,
     scan_plugin_database,
-    scan_system_plugins,
-    register as register_vst
+    register as register_vst,
 )
 from fl_studio_mcp.tools.library import scan_user_library, register as register_library
 from fl_studio_mcp.tools.gui_automation import register as register_gui
+
 
 def test_automation_factory():
     """Test that the automation factory returns the correct class per platform."""
@@ -31,20 +30,21 @@ def test_automation_factory():
         auto = get_automation()
         assert isinstance(auto, FallbackAutomation)
 
+
 def test_macos_automation_methods():
     """Test MacOSAutomation AppleScript generation and commands."""
     auto = MacOSAutomation()
-    
+
     with patch("subprocess.run") as mock_run:
         mock_run.return_value = MagicMock(returncode=0, stdout="success")
-        
+
         # Test focus
         assert auto.focus_fl_studio() is True
         mock_run.assert_called_with(
             ["osascript", "-e", 'tell application "FL Studio" to activate'],
             capture_output=True,
             text=True,
-            check=False
+            check=False,
         )
 
         # Test load plugin
@@ -55,15 +55,15 @@ def test_macos_automation_methods():
         assert "-e" in args
         script_arg = args[2]
         assert "Serum" in script_arg
-        assert "key code 100" in script_arg # F8
-        assert "key code 36" in script_arg # Enter
+        assert "key code 100" in script_arg  # F8
+        assert "key code 36" in script_arg  # Enter
 
         # Test open file
         assert auto.open_file("/path/to/project.flp") is True
         mock_run.assert_called_with(
             ["open", "-a", "FL Studio", "/path/to/project.flp"],
             capture_output=True,
-            check=False
+            check=False,
         )
 
         # Test click_at
@@ -86,6 +86,7 @@ def test_macos_automation_methods():
         args = mock_run.call_args[0][0]
         assert "key code 53" in args[2]
 
+
 def test_macos_automation_relative_click():
     """Test MacOSAutomation click_at with relative coordinates."""
     auto = MacOSAutomation()
@@ -96,12 +97,13 @@ def test_macos_automation_relative_click():
         mock_run.side_effect = [
             MagicMock(returncode=0, stdout="success"),
             MagicMock(returncode=0, stdout="150,250"),
-            MagicMock(returncode=0, stdout="success")
+            MagicMock(returncode=0, stdout="success"),
         ]
         assert auto.click_at(100, 200, delay_ms=0, relative=True) is True
         # Verify the click coordinates are window offset (150+100, 250+200) = (250, 450)
         args = mock_run.call_args[0][0]
         assert "click at {250, 450}" in args[2]
+
 
 def test_macos_automation_absolute_click():
     """Test MacOSAutomation click_at with absolute coordinates."""
@@ -109,22 +111,22 @@ def test_macos_automation_absolute_click():
     with patch("subprocess.run") as mock_run:
         mock_run.side_effect = [
             MagicMock(returncode=0, stdout="success"),
-            MagicMock(returncode=0, stdout="success")
+            MagicMock(returncode=0, stdout="success"),
         ]
         assert auto.click_at(100, 200, delay_ms=0, relative=False) is True
         args = mock_run.call_args[0][0]
         assert "click at {100, 200}" in args[2]
 
+
 def test_windows_automation_methods():
     """Test WindowsAutomation VBScript generation and cscript execution."""
     auto = WindowsAutomation()
-    
-    with patch("tempfile.mkstemp") as mock_mkstemp, \
-         patch("os.fdopen") as mock_fdopen, \
-         patch("subprocess.run") as mock_run, \
-         patch("os.path.exists") as mock_exists, \
-         patch("os.remove") as mock_remove:
-         
+
+    with patch("tempfile.mkstemp") as mock_mkstemp, patch(
+        "os.fdopen"
+    ) as mock_fdopen, patch("subprocess.run") as mock_run, patch(
+        "os.path.exists"
+    ) as mock_exists, patch("os.remove") as mock_remove:
         mock_mkstemp.return_value = (99, "temp.vbs")
         mock_file = MagicMock()
         mock_fdopen.return_value.__enter__.return_value = mock_file
@@ -134,23 +136,23 @@ def test_windows_automation_methods():
         # Test focus
         assert auto.focus_fl_studio() is True
         mock_file.write.assert_called_once()
-        assert "AppActivate(\"FL Studio\")" in mock_file.write.call_args[0][0]
+        assert 'AppActivate("FL Studio")' in mock_file.write.call_args[0][0]
         mock_run.assert_called_with(
             ["cscript", "//nologo", "temp.vbs"],
             capture_output=True,
             text=True,
             errors="replace",
             timeout=5.0,
-            check=False
+            check=False,
         )
         mock_remove.assert_called_with("temp.vbs")
 
         # Test load plugin
         mock_file.reset_mock()
         assert auto.load_plugin("Harmless") is True
-        assert "SendKeys \"Harmless\"" in mock_file.write.call_args[0][0]
-        assert "SendKeys \"{F8}\"" in mock_file.write.call_args[0][0]
-        assert "SendKeys \"{ENTER}\"" in mock_file.write.call_args[0][0]
+        assert 'SendKeys "Harmless"' in mock_file.write.call_args[0][0]
+        assert 'SendKeys "{F8}"' in mock_file.write.call_args[0][0]
+        assert 'SendKeys "{ENTER}"' in mock_file.write.call_args[0][0]
 
         # Test click_at
         mock_run.reset_mock()
@@ -164,17 +166,18 @@ def test_windows_automation_methods():
         # Test reset_ui
         mock_file.reset_mock()
         assert auto.reset_ui() is True
-        assert "SendKeys \"^+H\"" in mock_file.write.call_args[0][0]
+        assert 'SendKeys "^+H"' in mock_file.write.call_args[0][0]
 
         # Test dismiss_popup confirm
         mock_file.reset_mock()
         assert auto.dismiss_popup("confirm") is True
-        assert "SendKeys \"{ENTER}\"" in mock_file.write.call_args[0][0]
+        assert 'SendKeys "{ENTER}"' in mock_file.write.call_args[0][0]
 
         # Test dismiss_popup cancel
         mock_file.reset_mock()
         assert auto.dismiss_popup("cancel") is True
-        assert "SendKeys \"{ESC}\"" in mock_file.write.call_args[0][0]
+        assert 'SendKeys "{ESC}"' in mock_file.write.call_args[0][0]
+
 
 def test_windows_automation_relative_click():
     """Test WindowsAutomation click_at with relative coordinates and scaling."""
@@ -189,6 +192,7 @@ def test_windows_automation_relative_click():
             assert "$click_x = $left + [int](100 * $scale)" in ps_cmd
             assert "$click_y = $top + [int](200 * $scale)" in ps_cmd
 
+
 def test_windows_automation_absolute_click():
     """Test WindowsAutomation click_at with absolute coordinates."""
     auto = WindowsAutomation()
@@ -201,37 +205,40 @@ def test_windows_automation_absolute_click():
             assert "$click_x = 100;" in ps_cmd
             assert "$click_y = 200;" in ps_cmd
 
+
 def test_windows_open_file():
     """Test WindowsAutomation open_file handles os.startfile or cmd shell fallback."""
     auto = WindowsAutomation()
-    
+
     with patch("os.startfile", create=True) as mock_startfile:
         assert auto.open_file("my_project.flp") is True
         mock_startfile.assert_called_once_with("my_project.flp")
 
     # If os.startfile doesn't exist
     orig_hasattr = hasattr
+
     def mock_hasattr(obj, name):
         if obj is os and name == "startfile":
             return False
         return orig_hasattr(obj, name)
 
-    with patch("builtins.hasattr", side_effect=mock_hasattr), \
-         patch("subprocess.run") as mock_run:
+    with patch("builtins.hasattr", side_effect=mock_hasattr), patch(
+        "subprocess.run"
+    ) as mock_run:
         mock_run.return_value = MagicMock(returncode=0)
         assert auto.open_file("my_project.flp") is True
         mock_run.assert_called_once_with(
             ["cmd", "/c", "start", "my_project.flp"],
             capture_output=True,
-            check=False
+            text=True,
+            check=False,
         )
 
 
 def test_path_resolution(tmp_path):
     """Test get_fl_user_data_path handles windows/mac folders correctly."""
     # Test macOS
-    with patch("sys.platform", "darwin"), \
-         patch("pathlib.Path.home") as mock_home:
+    with patch("sys.platform", "darwin"), patch("pathlib.Path.home") as mock_home:
         mock_home.return_value = tmp_path
         expected = tmp_path / "Documents" / "Image-Line" / "FL Studio"
         assert get_fl_user_data_path() == expected
@@ -240,8 +247,9 @@ def test_path_resolution(tmp_path):
     mock_ctypes = MagicMock()
     mock_buf = MagicMock(value=str(tmp_path))
     mock_ctypes.create_unicode_buffer.return_value = mock_buf
-    with patch("sys.platform", "win32"), \
-         patch.dict("sys.modules", {"ctypes": mock_ctypes}):
+    with patch("sys.platform", "win32"), patch.dict(
+        "sys.modules", {"ctypes": mock_ctypes}
+    ):
         expected = tmp_path / "Image-Line" / "FL Studio"
         assert get_fl_user_data_path() == expected
         mock_ctypes.windll.shell32.SHGetFolderPathW.assert_called_once()
@@ -259,11 +267,13 @@ def test_vst_scanner(tmp_path):
     Path(db_path / "Generators" / "Synths" / "Serum.fst").touch()
     Path(db_path / "Effects" / "Reverbs" / "Valhalla.fst").touch()
 
-    with patch("fl_studio_mcp.tools.vst_scanner.get_fl_user_data_path") as mock_get_path:
+    with patch(
+        "fl_studio_mcp.tools.vst_scanner.get_fl_user_data_path"
+    ) as mock_get_path:
         mock_get_path.return_value = fl_user
-        
+
         result = scan_plugin_database()
-        
+
         assert len(result["generators"]) == 1
         assert result["generators"][0]["name"] == "Serum"
         assert result["generators"][0]["category"] == "Synths"
@@ -271,6 +281,7 @@ def test_vst_scanner(tmp_path):
         assert len(result["effects"]) == 1
         assert result["effects"][0]["name"] == "Valhalla"
         assert result["effects"][0]["category"] == "Reverbs"
+
 
 def test_library_scanner(tmp_path):
     """Test scan_user_library indexes templates and scores correctly."""
@@ -281,12 +292,13 @@ def test_library_scanner(tmp_path):
 
     with patch("fl_studio_mcp.tools.library.get_fl_user_data_path") as mock_get_path:
         mock_get_path.return_value = fl_user
-        
+
         result = scan_user_library("scores")
         assert "scores" in result
         assert len(result["scores"]) == 1
         assert result["scores"][0]["name"] == "Major"
         assert result["scores"][0]["category"] == "Chords"
+
 
 @pytest.mark.asyncio
 async def test_tools_registration():
@@ -304,4 +316,3 @@ async def test_tools_registration():
     assert "fl_click_at" in tools
     assert "fl_reset_ui" in tools
     assert "fl_dismiss_popup" in tools
-
