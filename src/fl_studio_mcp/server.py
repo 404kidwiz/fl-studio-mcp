@@ -86,6 +86,16 @@ from .tools import (
     hardware_midi,
     latency,
     custom_ui,
+    podcast_editing,
+    spectral_morphing,
+    remix_contest,
+    mpe_generation,
+    orchestral_scoring,
+    lyric_video,
+    master_bus,
+    lofi_fx,
+    arrangement_mutator,
+    preset_curator,
 )
 
 from . import resources, prompts
@@ -175,6 +185,16 @@ transition_fx.register(mcp)
 hardware_midi.register(mcp)
 latency.register(mcp)
 custom_ui.register(mcp)
+podcast_editing.register(mcp)
+spectral_morphing.register(mcp)
+remix_contest.register(mcp)
+mpe_generation.register(mcp)
+orchestral_scoring.register(mcp)
+lyric_video.register(mcp)
+master_bus.register(mcp)
+lofi_fx.register(mcp)
+arrangement_mutator.register(mcp)
+preset_curator.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)

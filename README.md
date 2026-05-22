@@ -25,7 +25,7 @@
 
 ## 🎼 Overwhelming Developer & Producer Power
 
-The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **101 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, version control, and extreme AI automation—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
+The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **111 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, version control, and extreme AI automation—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
 
 Whether you're looking to generate complex polyrhythms, optimize harmonic chord voicings, or automate a visual click inside Serum, the FL Studio MCP gives you full, type-safe, dry-run-capable control over your DAW.
 
@@ -72,7 +72,7 @@ The codebase is highly modular and strictly structured:
 
 ## 🧰 The Toolkit (101 Tools)
 
-FL Studio MCP exposes a massively comprehensive suite of **101 distinct tools**, broken down by production phase:
+FL Studio MCP exposes a massively comprehensive suite of **111 distinct tools**, broken down by production phase:
 
 ### 1. Connection & Diagnostics (3)
 | Tool Name | Description | Needs Bridge Script |
@@ -245,6 +245,18 @@ FL Studio MCP exposes a massively comprehensive suite of **101 distinct tools**,
 *   **`fl_hardware_synth_patch_dumper`**: Bridge SysEx to pull and save patches from external hardware gear.
 *   **`fl_plugin_latency_compensator`**: Auto-detect and fix manual track delays for PDC phase smearing.
 *   **`fl_holographic_mixer_ui`**: Build a Patcher dashboard of the top 10 most-automated project parameters.
+
+#### **Phase 15: The Director (Tools 102 - 111)**
+*   **`fl_podcast_auto_editor`**: Detect silence, cross-talk, and apply gating/ducking for broadcast podcasts.
+*   **`fl_spectral_morphing_engine`**: Use Harmor to morph spectral characteristics of two distinct samples.
+*   **`fl_automated_remix_contest_parser`**: Unpack stems, detect key/BPM, and map to Playlist perfectly.
+*   **`fl_polyphonic_aftertouch_generator`**: Generate complex MPE automation data for block chords.
+*   **`fl_orchestral_articulation_mapper`**: Swap orchestral articulations based on MIDI phrasing (via BRSO).
+*   **`fl_generative_lyric_video_sync`**: Map lyric text to vocal transients via ZGameEditor Visualizer.
+*   **`fl_master_bus_clipper_optimizer`**: Mathematically soft-clip master bus to save headroom perfectly.
+*   **`fl_lofi_degradation_matrix`**: Apply automated tape wow, flutter, and vinyl crackle routed via parallel.
+*   **`fl_song_structure_mutator`**: Algorithmic rearrangement of Playlist blocks to IDM/Glitch hop sequence.
+*   **`fl_vst_preset_ai_curator`**: Scan local .fst libraries and NLP tag presets for instant loading.
 
 ---
 
