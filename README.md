@@ -70,9 +70,9 @@ The codebase is highly modular and strictly structured:
 
 ---
 
-## 🧰 The Toolkit (66 Tools)
+## 🧰 The Toolkit (71 Tools)
 
-FL Studio MCP exposes a massively comprehensive suite of **66 distinct tools**, broken down by production phase:
+FL Studio MCP exposes a massively comprehensive suite of **71 distinct tools**, broken down by production phase:
 
 ### 1. Connection & Diagnostics (3)
 | Tool Name | Description | Needs Bridge Script |
@@ -202,6 +202,13 @@ FL Studio MCP exposes a massively comprehensive suite of **66 distinct tools**, 
 - `fl_audio_to_midi` – Extracts harmonic pitch data from audio and converts it to Piano Roll MIDI notes.
 - `fl_generate_counter_melody` – Analyzes a chord progression to generate a complementary counter-melody.
 - `fl_build_patcher_instrument` – Programmatically builds a complex layered instrument using FL Studio's Patcher.
+
+### 🌐 Phase 11: The Executive Producer
+- `fl_vst_auto_replace` – Detects missing 3rd-party VSTs and mathematically matches a native equivalent.
+- `fl_vocal_aligner` – Native time-warping automation to phase-align background vocals to a lead.
+- `fl_generate_visualizer_zgame` – Automatically generates a 3D audio-reactive music video synced to the beat.
+- `fl_project_version_control` – Implements Git-style branching (commit, checkout) for FLP project files.
+- `fl_export_dolby_atmos_stems` – Formats, groups, and bounces the session perfectly for Dolby Atmos mixing.
 
 ---
 

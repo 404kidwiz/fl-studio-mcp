@@ -55,6 +55,11 @@ from .tools import (
     creative_fx,
     audio_ai,
     workflow_advanced,
+    vst_bridge,
+    vocal_alignment,
+    video_generation,
+    project_vc,
+    spatial_audio,
 )
 
 from . import resources, prompts
@@ -113,6 +118,11 @@ mastering.register(mcp)
 creative_fx.register(mcp)
 audio_ai.register(mcp)
 workflow_advanced.register(mcp)
+vst_bridge.register(mcp)
+vocal_alignment.register(mcp)
+video_generation.register(mcp)
+project_vc.register(mcp)
+spatial_audio.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)
