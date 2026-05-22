@@ -51,6 +51,10 @@ from .tools import (
     mix_engineer,
     arranger,
     sound_design,
+    mastering,
+    creative_fx,
+    audio_ai,
+    workflow_advanced,
 )
 
 from . import resources, prompts
@@ -105,6 +109,10 @@ collaboration.register(mcp)
 mix_engineer.register(mcp)
 arranger.register(mcp)
 sound_design.register(mcp)
+mastering.register(mcp)
+creative_fx.register(mcp)
+audio_ai.register(mcp)
+workflow_advanced.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)

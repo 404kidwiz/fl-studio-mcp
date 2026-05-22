@@ -70,9 +70,9 @@ The codebase is highly modular and strictly structured:
 
 ---
 
-## 🎛️ Complete Tools Reference (59 Tools)
+## 🧰 The Toolkit (66 Tools)
 
-FL Studio MCP exposes a robust catalog of **59 FastMCP tools** organized into clean functional areas:
+FL Studio MCP exposes a massively comprehensive suite of **66 distinct tools**, broken down by production phase:
 
 ### 1. Connection & Diagnostics (3)
 | Tool Name | Description | Needs Bridge Script |
@@ -193,6 +193,15 @@ FL Studio MCP exposes a robust catalog of **59 FastMCP tools** organized into cl
 | `fl_generate_song_structure` | Expands a loop into a full 3-minute arrangement (Intro, Verse, Chorus, etc.). | **No** |
 | `fl_generate_transitions` | Injects risers, crashes, and automated filter sweeps at song section boundaries. | **No** |
 | `fl_generate_synth_preset` | AI generates parameters for synths (Vital, Serum) from natural language prompts. | **No** |
+
+### 🎚️ Phase 10: Mastering & Creative Director
+- `fl_auto_master` – Applies a commercial mastering chain driven to hit a target LUFS (e.g. -14 LUFS).
+- `fl_eq_reference_match` – Analyzes and applies an EQ curve to match the tonal balance of a commercial reference track.
+- `fl_gross_beat_automator` – Automates Gross Beat for instant halftime, tape-stop, and gated FX.
+- `fl_auto_glitch_chops` – Automatically slices and rearranges playlist audio clips for glitch fills.
+- `fl_audio_to_midi` – Extracts harmonic pitch data from audio and converts it to Piano Roll MIDI notes.
+- `fl_generate_counter_melody` – Analyzes a chord progression to generate a complementary counter-melody.
+- `fl_build_patcher_instrument` – Programmatically builds a complex layered instrument using FL Studio's Patcher.
 
 ---
 
