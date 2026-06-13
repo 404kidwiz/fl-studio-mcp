@@ -17,7 +17,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-blue?style=for-the-badge&logo=python" alt="Python Versions"/>
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-green?style=for-the-badge" alt="Platforms"/>
-  <img src="https://img.shields.io/badge/Tests-460%20Passing-success?style=for-the-badge&logo=pytest" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-472%20Passing-success?style=for-the-badge&logo=pytest" alt="Tests"/>
   <img src="https://img.shields.io/badge/License-MIT-orange?style=for-the-badge" alt="License"/>
 </p>
 
@@ -372,13 +372,37 @@ uv run fl-studio channels mute 1
 
 # Safe emergency halt
 uv run fl-studio panic
+
+# Song & Project Management
+uv run fl-studio get-song-length
+uv run fl-studio get-song-tempo
+uv run fl-studio get-song-bpm
+uv run fl-studio get-song-info
+uv run fl-studio set-song-bpm --bpm 128 --confirm
+uv run fl-studio set-song-tempo-relative --percentage 20 --confirm
+uv run fl-studio set-song-marker --marker-name "Intro" --color-r 255 --color-g 0 --color-b 0
+uv run fl-studio get-marker --marker-index 0
+uv run fl-studio delete-marker --marker-index 0
+uv run fl-studio insert-marker --position-beats 16.0 --marker-name "Verse" --color-r 0 --color-g 255 --color-b 0
+uv run fl-studio save-as-project --filename "MySong.flp" --confirm
+uv run fl-studio export-audio --output-path "out.wav" --format wav --quality 80 --confirm
+uv run fl-studio get-mixer-track-count
+uv run fl-studio get-channel-count
+uv run fl-studio get-pattern-count
+uv run fl-studio get-current-pattern
+uv run fl-studio set-current-pattern --pattern-index 2 --confirm
+uv run fl-studio duplicate-pattern
+uv run fl-studio copy-pattern --target-pattern-index 10
+uv run fl-studio cut-pattern
+uv run fl-studio paste-pattern --target-pattern-index 7
+uv run fl-studio clear-pattern
 ```
 
 ---
 
 ## 🧪 Comprehensive Tests (100% Green)
 
-The server is backed by a massive **337-test suite** covering MIDI packet serializations, music theory matrix mathematics, concurrent lock scheduling, mock OS AppleScript/VBScript string matches, and WebSocket network connection lifecycles:
+The server is backed by a massive **472-test suite** covering MIDI packet serializations, music theory matrix mathematics, concurrent lock scheduling, mock OS AppleScript/VBScript string matches, and WebSocket network connection lifecycles:
 
 ```bash
 # Run the complete test suite (runs fully in-memory, no hardware required!)

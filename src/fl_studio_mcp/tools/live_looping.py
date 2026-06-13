@@ -4,10 +4,10 @@ def fl_adaptive_live_looping() -> str:
     instances that automatically slice and dump to the Playlist.
     """
     return (
-        f"Configured 4 Edison instances on Mixer Tracks 1-4 for Live Looping.\\n"
-        f"Mapped MIDI controller to Edison trigger recording.\\n"
-        f"Auto-dump to Playlist on loop stop enabled.\\n"
-        f"Live Looping session ready."
+        "Configured 4 Edison instances on Mixer Tracks 1-4 for Live Looping.\\n"
+        "Mapped MIDI controller to Edison trigger recording.\\n"
+        "Auto-dump to Playlist on loop stop enabled.\\n"
+        "Live Looping session ready."
     )
 
 def register(mcp) -> None:

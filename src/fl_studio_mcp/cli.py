@@ -10,6 +10,14 @@ import click
 from .bridge import FLStudioBridge
 
 
+def cli_echo(data, *, indent=2):
+    """Output a tool result: strings echoed as-is, dicts/lists formatted as JSON."""
+    if isinstance(data, str):
+        click.echo(data)
+    else:
+        click.echo(json.dumps(data, indent=indent))
+
+
 def get_config_path() -> Path:
     """Get the configuration file path dynamically."""
     return Path.expanduser(Path("~/.fl_studio_mcp.json"))
@@ -227,7 +235,7 @@ def play() -> None:
     from .protocol import mmc_play
 
     res = bridge.send_raw(mmc_play())
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command()
@@ -237,7 +245,7 @@ def stop() -> None:
     from .protocol import mmc_stop
 
     res = bridge.send_raw(mmc_stop())
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command()
@@ -247,7 +255,7 @@ def save() -> None:
     from .protocol import encode_save
 
     res = bridge.send_raw(encode_save())
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command()
@@ -273,7 +281,7 @@ def undo(ack: bool, timeout: int) -> None:
         )
     else:
         res = bridge.send_raw(encode_undo())
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command()
@@ -299,7 +307,7 @@ def redo(ack: bool, timeout: int) -> None:
         )
     else:
         res = bridge.send_raw(encode_redo())
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command()
@@ -330,7 +338,7 @@ def ping(challenge: int, timeout: int) -> None:
             "challenge": challenge,
             "response_time_ms": 0.0,
         }
-        click.echo(json.dumps(res, indent=2))
+        cli_echo(res)
         return
 
     try:
@@ -377,7 +385,7 @@ def ping(challenge: int, timeout: int) -> None:
             )
         )
     except Exception as exc:
-        click.echo(json.dumps({"error": "ERROR", "message": str(exc)}, indent=2))
+        cli_echo({"error": "ERROR", "message": str(exc)})
 
 
 @main.command()
@@ -416,7 +424,7 @@ def tempo(bpm: int) -> None:
 
     res = bridge.send_raw(encode_tempo(bpm))
     res["bpm"] = bpm
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 # --- Song / Project Management commands ---
@@ -462,7 +470,7 @@ def cli_set_song_marker(marker_name: str, color_r: int, color_g: int, color_b: i
     res["marker_name"] = marker_name
     res["color"] = [color_r, color_g, color_b]
     res["command"] = "ADD_MARKER"
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command(name="get-marker")
@@ -498,7 +506,7 @@ def cli_delete_marker(marker_index: int) -> None:
     res = bridge.send_raw(sysex)
     res["marker_index"] = marker_index
     res["command"] = "DELETE_MARKER"
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command(name="insert-marker")
@@ -590,7 +598,7 @@ def cli_set_song_bpm(bpm: int, confirm: bool) -> None:
     res = bridge.send_raw(sysex)
     res["bpm"] = bpm
     res["command"] = "SET_TEMPO"
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command(name="get-song-bpm")
@@ -641,7 +649,7 @@ def cli_set_song_tempo_relative(percentage: int, confirm: bool) -> None:
     res["new_bpm"] = new_bpm
     res["percentage"] = percentage
     res["command"] = "SET_TEMPO_RELATIVE"
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command(name="get-song-info")
@@ -692,7 +700,7 @@ def cli_save_as_project(filename: str, confirm: bool) -> None:
     res = bridge.send_raw(sysex)
     res["filename"] = filename
     res["command"] = "SAVE_AS"
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command(name="export-audio")
@@ -843,7 +851,7 @@ def cli_set_current_pattern(pattern_index: int, confirm: bool) -> None:
     res = bridge.send_raw(sysex)
     res["pattern_index"] = pattern_index
     res["command"] = "SELECT_PATTERN"
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command(name="duplicate-pattern")
@@ -854,7 +862,7 @@ def cli_duplicate_pattern() -> None:
 
     res = bridge.send_raw(encode_new_pattern())
     res["command"] = "DUPLICATE_PATTERN"
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command(name="copy-pattern")
@@ -973,7 +981,7 @@ def channels_volume(index: int, value: int) -> None:
     res = bridge.send_raw(encode_set_channel_vol(index, value))
     res["channel_index"] = index
     res["volume"] = value
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @channels.command(name="pan")
@@ -987,7 +995,7 @@ def channels_pan(index: int, value: int) -> None:
     res = bridge.send_raw(encode_set_channel_pan(index, value))
     res["channel_index"] = index
     res["pan"] = value
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @channels.command(name="mute")
@@ -1002,7 +1010,7 @@ def channels_mute(index: int, unmute: bool) -> None:
     res = bridge.send_raw(encode_mute_channel(index, muted))
     res["channel_index"] = index
     res["muted"] = muted
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @channels.command(name="solo")
@@ -1017,7 +1025,7 @@ def channels_solo(index: int, unsolo: bool) -> None:
     res = bridge.send_raw(encode_solo_channel(index, soloed))
     res["channel_index"] = index
     res["soloed"] = soloed
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @channels.command(name="rename")
@@ -1035,7 +1043,7 @@ def channels_rename(index: int, name: str) -> None:
     res = bridge.send_raw(encode_rename_channel(index, name))
     res["channel_index"] = index
     res["name"] = name
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 # --- Patterns commands ---
@@ -1087,7 +1095,7 @@ def patterns_select(index: int) -> None:
 
     res = bridge.send_raw(encode_select_pattern(index))
     res["pattern_index"] = index
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @patterns.command(name="create")
@@ -1097,7 +1105,7 @@ def patterns_create() -> None:
     from .protocol import encode_new_pattern
 
     res = bridge.send_raw(encode_new_pattern())
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @patterns.command(name="notes")
@@ -1181,7 +1189,7 @@ def patterns_length(index: int, length_beats: int) -> None:
     res = bridge.send_raw(encode_set_pattern_length(index, length_beats))
     res["pattern_index"] = index
     res["length_beats"] = length_beats
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @patterns.command(name="rename")
@@ -1199,7 +1207,7 @@ def patterns_rename(index: int, name: str) -> None:
     res = bridge.send_raw(encode_rename_pattern(index, name))
     res["pattern_index"] = index
     res["name"] = name
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 # --- Notes commands ---
@@ -1270,7 +1278,7 @@ def notes_insert(
         raise click.ClickException(f"Invalid note parameters: {exc}")
 
     res = bridge.send_raw(encode_notes([note_obj.model_dump()]))
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @main.command()
@@ -1347,7 +1355,7 @@ def chord(
         raise click.ClickException(f"Invalid chord parameters: {exc}")
 
     res = bridge.send_raw(encode_notes([n.model_dump() for n in chord_notes]))
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 # --- Plugins commands ---
@@ -1373,7 +1381,7 @@ def plugins_list(scan_system: bool) -> None:
     result = {"plugin_database": db, "system_plugins": []}
     if scan_system:
         result["system_plugins"] = scan_system_plugins()
-    click.echo(json.dumps(result, indent=2))
+    cli_echo(result)
 
 
 @plugins.command(name="load")
@@ -1414,7 +1422,7 @@ def library_list(library_type: str) -> None:
     from .tools.library import scan_user_library
 
     files = scan_user_library(library_type)
-    click.echo(json.dumps(files, indent=2))
+    cli_echo(files)
 
 
 @library.command(name="load")
@@ -1512,7 +1520,7 @@ def context(timeout: int) -> None:
         }
 
     res = run_async(query_all())
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 # --- Mixer commands ---
@@ -1535,7 +1543,7 @@ def mixer_volume(track_index: int, value: int) -> None:
     res = bridge.send_raw(encode_set_mixer_vol(track_index, value))
     res["track_index"] = track_index
     res["volume"] = value
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @mixer.command(name="pan")
@@ -1549,7 +1557,7 @@ def mixer_pan(track_index: int, value: int) -> None:
     res = bridge.send_raw(encode_set_mixer_pan(track_index, value))
     res["track_index"] = track_index
     res["pan"] = value
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @mixer.command(name="route")
@@ -1563,7 +1571,7 @@ def mixer_route(channel_index: int, track_index: int) -> None:
     res = bridge.send_raw(encode_route_to_mixer(channel_index, track_index))
     res["channel_index"] = channel_index
     res["track_index"] = track_index
-    click.echo(json.dumps(res, indent=2))
+    cli_echo(res)
 
 
 @mixer.command(name="state")
@@ -1632,7 +1640,7 @@ def mixer_state(start: int, end: int, timeout: int) -> None:
         )
     state_info = decode_resp_mixer_state(res["payload"])
     state_info["source"] = "fl_studio"
-    click.echo(json.dumps(state_info, indent=2))
+    cli_echo(state_info)
 
 
 # --- Composition commands ---

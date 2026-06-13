@@ -8,15 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.0] - 2026-06-12
 
 ### Added
-- **Song/Project Management Tools**: 26 new MCP tools for markers (set/get/delete/insert), tempo control (get/set/relative), song info, save-as, audio export, mixer/channel/pattern queries, pattern clipboard (duplicate/copy/cut/paste/clear) — total tools 144
+- **Song/Project Management Tools**: 26 new MCP tools for markers (set/get/delete/insert), tempo control (get/set/relative), song info, save-as, audio export, mixer/channel/pattern queries, pattern clipboard (duplicate/copy/cut/paste/clear) — total tools 166
 - **22 New CLI Commands**: Full CLI parity for all song/project management commands (get-song-length, set-song-marker, get-marker, delete-marker, insert-marker, get-song-tempo, set-song-bpm, get-song-bpm, set-song-tempo-relative, get-song-info, save-as-project, export-audio, get-mixer-track-count, get-channel-count, get-pattern-count, get-current-pattern, set-current-pattern, duplicate-pattern, copy-pattern, cut-pattern, paste-pattern, clear-pattern)
-- **88 New Tests**: Full test coverage for 31 protocol encoders, 30 MCP tool behaviors, and 23 CLI commands
+- **100 New Tests**: Full test coverage for 31 protocol encoders, 30 MCP tool behaviors, and 23 CLI commands; includes live-mode success tests, error injection tests, and CLI --help integration test
 - **WORKFLOWS.md**: Step-by-step tutorials for song production, marker management, tempo automation, project management, and pattern operations
 - **API_REFERENCE.md**: Complete parameter/error documentation for all 166 tools
+- **`validate_color()` helper**: Consolidated color validation in `protocol.py` (3 call sites)
+- **`cli_echo()` helper**: Centralized CLI JSON output in `cli.py` (33 call sites)
 
 ### Fixed
+- **Placeholder Stubs Replaced**: 10 tools (fl_insert_marker, fl_get_song_bpm, fl_export_audio, fl_copy/cut/paste/clear_pattern, fl_set_song_tempo_relative, fl_get_marker) now send real SysEx commands via `bridge.send_raw()` instead of returning static mock data
 - **Missing Import**: Added `decode_resp_status` import to `song_project_management.py` for live-mode queries
 - **Protocol Duplication**: Removed conflicting duplicate command constants (`CMD_QUERY_CHANNELS`, `CMD_QUERY_PATTERNS`, `CMD_QUERY_MIXER_STATE`) from the new song management section; reassigned new pattern commands to dedicated numbers (0x0A, 0x09, 0x35–0x39)
+- **Missing Field**: Added `timeout_ms` to `GetSongBpmInput` model to enable live queries
+
+### Changed
+- **CI**: Added `ruff check` lint step to `test.yml` before running tests
+- **Dev Dependencies**: Added `ruff>=0.11.0` and `mypy>=1.15.0` to `[dependency-groups] dev`
 
 ## [0.8.0] - 2026-05-22
 

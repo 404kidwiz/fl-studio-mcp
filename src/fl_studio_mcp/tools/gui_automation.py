@@ -1,7 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 from ..bridge import format_result, send_command_sync
 from ..automation import get_automation
-from ..protocol import encode_show_window
 import asyncio
 
 

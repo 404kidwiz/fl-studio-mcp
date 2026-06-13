@@ -465,11 +465,36 @@ class TestSongProjectTools:
     async def test_fl_insert_marker_dry_run(self, dry_bridge):
         fn = _tool("song_project_management", "fl_insert_marker")
         result = parse(await fn(InsertMarkerInput(position_beats=120.5, marker_name="Verse 1", color_r=255, color_g=128, color_b=0)))
+        assert result["dry_run"] is True
         assert result["position_beats"] == 120.5
         assert result["marker_name"] == "Verse 1"
         assert result["color"] == [255, 128, 0]
         assert result["command"] == "INSERT_MARKER"
-        assert result["source"] == "fl_studio"
+        assert "F0 7D 2E" in result["would_send_bytes"]
+
+    async def test_fl_insert_marker_live_success(self, dry_bridge):
+        dry_bridge._dry_run = False
+        dry_bridge._input_port = unittest.mock.Mock()
+        dry_bridge._output_port = unittest.mock.Mock()
+
+        def mock_send(msg):
+            cmd, payload = decode_sysex(msg.bytes())
+            if cmd == CMD_INSERT_MARKER:
+                _inject_response(dry_bridge, 0x1F, [CMD_INSERT_MARKER])
+
+        dry_bridge._output_port.send = mock_send
+
+        fn = _tool("song_project_management", "fl_insert_marker")
+        result = parse(await fn(InsertMarkerInput(position_beats=120.5, marker_name="Verse 1", color_r=255, color_g=128, color_b=0)))
+        assert result["sent"] is True
+        assert result["position_beats"] == 120.5
+        assert result["marker_name"] == "Verse 1"
+        assert result["color"] == [255, 128, 0]
+        assert result["command"] == "INSERT_MARKER"
+
+        dry_bridge._dry_run = True
+        dry_bridge._input_port = None
+        dry_bridge._output_port = None
 
     async def test_fl_get_song_tempo_dry_run(self, dry_bridge):
         fn = _tool("song_project_management", "fl_get_song_tempo")
@@ -516,8 +541,30 @@ class TestSongProjectTools:
     async def test_fl_get_song_bpm_dry_run(self, dry_bridge):
         fn = _tool("song_project_management", "fl_get_song_bpm")
         result = parse(await fn(GetSongBpmInput()))
+        assert result["dry_run"] is True
         assert result["bpm"] == 120.0
+        assert result["source"] == "dry_run_preview"
+
+    async def test_fl_get_song_bpm_live_success(self, dry_bridge):
+        dry_bridge._dry_run = False
+        dry_bridge._input_port = unittest.mock.Mock()
+        dry_bridge._output_port = unittest.mock.Mock()
+
+        def mock_send(msg):
+            cmd, payload = decode_sysex(msg.bytes())
+            if cmd == CMD_QUERY_STATUS:
+                _inject_response(dry_bridge, RESP_STATUS, [1, 0, 140, 0, 16])
+
+        dry_bridge._output_port.send = mock_send
+
+        fn = _tool("song_project_management", "fl_get_song_bpm")
+        result = parse(await fn(GetSongBpmInput(timeout_ms=500)))
+        assert result["bpm"] == 140.0
         assert result["source"] == "fl_studio"
+
+        dry_bridge._dry_run = True
+        dry_bridge._input_port = None
+        dry_bridge._output_port = None
 
     async def test_fl_set_song_tempo_relative_dry_run(self, dry_bridge):
         fn = _tool("song_project_management", "fl_set_song_tempo_relative")
@@ -559,12 +606,36 @@ class TestSongProjectTools:
     async def test_fl_export_audio_dry_run(self, dry_bridge):
         fn = _tool("song_project_management", "fl_export_audio")
         result = parse(await fn(ExportAudioInput(output_path="/path/to/song.wav", format="wav", quality=80, confirm=True)))
+        assert result["dry_run"] is True
         assert result["output_path"] == "/path/to/song.wav"
         assert result["format"] == "wav"
         assert result["quality"] == 80
         assert result["command"] == "EXPORT_AUDIO"
-        assert result["status"] == "completed"
-        assert result["source"] == "fl_studio"
+        assert "F0 7D 32" in result["would_send_bytes"]
+
+    async def test_fl_export_audio_live_success(self, dry_bridge):
+        dry_bridge._dry_run = False
+        dry_bridge._input_port = unittest.mock.Mock()
+        dry_bridge._output_port = unittest.mock.Mock()
+
+        def mock_send(msg):
+            cmd, payload = decode_sysex(msg.bytes())
+            if cmd == CMD_EXPORT_AUDIO:
+                _inject_response(dry_bridge, 0x1F, [CMD_EXPORT_AUDIO])
+
+        dry_bridge._output_port.send = mock_send
+
+        fn = _tool("song_project_management", "fl_export_audio")
+        result = parse(await fn(ExportAudioInput(output_path="/path/to/song.wav", format="wav", quality=80, confirm=True)))
+        assert result["sent"] is True
+        assert result["output_path"] == "/path/to/song.wav"
+        assert result["format"] == "wav"
+        assert result["quality"] == 80
+        assert result["command"] == "EXPORT_AUDIO"
+
+        dry_bridge._dry_run = True
+        dry_bridge._input_port = None
+        dry_bridge._output_port = None
 
     async def test_fl_export_audio_requires_confirmation(self, dry_bridge):
         fn = _tool("song_project_management", "fl_export_audio")
@@ -620,40 +691,203 @@ class TestSongProjectTools:
     async def test_fl_copy_pattern_dry_run(self, dry_bridge):
         fn = _tool("song_project_management", "fl_copy_pattern")
         result = parse(await fn(CopyPatternInput(target_pattern_index=10)))
+        assert result["dry_run"] is True
         assert result["target_pattern_index"] == 10
         assert result["command"] == "COPY_PATTERN"
-        assert result["status"] == "completed"
-        assert result["source"] == "fl_studio"
+        assert "F0 7D 36 0A F7" in result["would_send_bytes"]
+
+    async def test_fl_copy_pattern_live_success(self, dry_bridge):
+        dry_bridge._dry_run = False
+        dry_bridge._input_port = unittest.mock.Mock()
+        dry_bridge._output_port = unittest.mock.Mock()
+
+        def mock_send(msg):
+            cmd, payload = decode_sysex(msg.bytes())
+            if cmd == CMD_COPY_PATTERN:
+                _inject_response(dry_bridge, 0x1F, [CMD_COPY_PATTERN])
+
+        dry_bridge._output_port.send = mock_send
+
+        fn = _tool("song_project_management", "fl_copy_pattern")
+        result = parse(await fn(CopyPatternInput(target_pattern_index=10)))
+        assert result["sent"] is True
+        assert result["target_pattern_index"] == 10
+        assert result["command"] == "COPY_PATTERN"
+
+        dry_bridge._dry_run = True
+        dry_bridge._input_port = None
+        dry_bridge._output_port = None
 
     async def test_fl_cut_pattern_dry_run(self, dry_bridge):
         fn = _tool("song_project_management", "fl_cut_pattern")
         result = parse(await fn(CutPatternInput()))
+        assert result["dry_run"] is True
         assert result["command"] == "CUT_PATTERN"
-        assert result["status"] == "completed"
-        assert result["source"] == "fl_studio"
+        assert "F0 7D 37 F7" in result["would_send_bytes"]
+
+    async def test_fl_cut_pattern_live_success(self, dry_bridge):
+        dry_bridge._dry_run = False
+        dry_bridge._input_port = unittest.mock.Mock()
+        dry_bridge._output_port = unittest.mock.Mock()
+
+        def mock_send(msg):
+            cmd, payload = decode_sysex(msg.bytes())
+            if cmd == CMD_CUT_PATTERN:
+                _inject_response(dry_bridge, 0x1F, [CMD_CUT_PATTERN])
+
+        dry_bridge._output_port.send = mock_send
+
+        fn = _tool("song_project_management", "fl_cut_pattern")
+        result = parse(await fn(CutPatternInput()))
+        assert result["sent"] is True
+        assert result["command"] == "CUT_PATTERN"
+
+        dry_bridge._dry_run = True
+        dry_bridge._input_port = None
+        dry_bridge._output_port = None
 
     async def test_fl_paste_pattern_dry_run(self, dry_bridge):
         fn = _tool("song_project_management", "fl_paste_pattern")
         result = parse(await fn(PastePatternInput(target_pattern_index=7)))
+        assert result["dry_run"] is True
         assert result["target_pattern_index"] == 7
         assert result["command"] == "PASTE_PATTERN"
-        assert result["status"] == "completed"
-        assert result["source"] == "fl_studio"
+        assert "F0 7D 38 07 F7" in result["would_send_bytes"]
+
+    async def test_fl_paste_pattern_live_success(self, dry_bridge):
+        dry_bridge._dry_run = False
+        dry_bridge._input_port = unittest.mock.Mock()
+        dry_bridge._output_port = unittest.mock.Mock()
+
+        def mock_send(msg):
+            cmd, payload = decode_sysex(msg.bytes())
+            if cmd == CMD_PASTE_PATTERN:
+                _inject_response(dry_bridge, 0x1F, [CMD_PASTE_PATTERN])
+
+        dry_bridge._output_port.send = mock_send
+
+        fn = _tool("song_project_management", "fl_paste_pattern")
+        result = parse(await fn(PastePatternInput(target_pattern_index=7, confirm=True)))
+        assert result["sent"] is True
+        assert result["target_pattern_index"] == 7
+        assert result["command"] == "PASTE_PATTERN"
+
+        dry_bridge._dry_run = True
+        dry_bridge._input_port = None
+        dry_bridge._output_port = None
 
     async def test_fl_clear_pattern_dry_run(self, dry_bridge):
         fn = _tool("song_project_management", "fl_clear_pattern")
         result = parse(await fn(ClearPatternInput()))
+        assert result["dry_run"] is True
         assert result["command"] == "CLEAR_PATTERN"
-        assert result["status"] == "completed"
-        assert result["source"] == "fl_studio"
+        assert "F0 7D 39 F7" in result["would_send_bytes"]
+
+    async def test_fl_clear_pattern_live_success(self, dry_bridge):
+        dry_bridge._dry_run = False
+        dry_bridge._input_port = unittest.mock.Mock()
+        dry_bridge._output_port = unittest.mock.Mock()
+
+        def mock_send(msg):
+            cmd, payload = decode_sysex(msg.bytes())
+            if cmd == CMD_CLEAR_PATTERN:
+                _inject_response(dry_bridge, 0x1F, [CMD_CLEAR_PATTERN])
+
+        dry_bridge._output_port.send = mock_send
+
+        fn = _tool("song_project_management", "fl_clear_pattern")
+        result = parse(await fn(ClearPatternInput()))
+        assert result["sent"] is True
+        assert result["command"] == "CLEAR_PATTERN"
+
+        dry_bridge._dry_run = True
+        dry_bridge._input_port = None
+        dry_bridge._output_port = None
 
 
 # ---------------------------------------------------------------------------
-# 3. CLI Command Tests
+# 3. Error Injection Tests
+# ---------------------------------------------------------------------------
+
+
+class TestErrorHandling:
+    """Test graceful failure when bridge is disconnected or encoding fails."""
+
+    async def test_tool_without_connected_bridge_returns_error(self, dry_bridge):
+        """No bridge connected → FLMCPError with DISCONNECTED error code."""
+        dry_bridge._dry_run = False
+        dry_bridge._connected = False
+
+        fn = _tool("song_project_management", "fl_set_song_marker")
+        result = parse(await fn(SetSongMarkerInput(marker_name="Test", color_r=255, color_g=0, color_b=0)))
+        assert "error" in result
+
+        dry_bridge._connected = True
+        dry_bridge._dry_run = True
+
+    async def test_send_raw_disconnected_returns_error(self, dry_bridge):
+        """send_raw when not connected returns error dict, not exception."""
+        dry_bridge._dry_run = False
+        dry_bridge._connected = False
+
+        fn = _tool("song_project_management", "fl_delete_marker")
+        result = parse(await fn(DeleteMarkerInput(marker_index=3)))
+        assert "error" in result
+
+        dry_bridge._connected = True
+        dry_bridge._dry_run = True
+
+    async def test_invalid_pattern_index_returns_error(self, dry_bridge):
+        """Copy/cut/paste with out-of-range index returns validation error."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            CopyPatternInput(target_pattern_index=-1)
+        with pytest.raises(ValidationError):
+            CopyPatternInput(target_pattern_index=128)
+
+        # Valid index but negative in paste → Pydantic rejects
+        with pytest.raises(ValidationError):
+            PastePatternInput(target_pattern_index=-1)
+        with pytest.raises(ValidationError):
+            PastePatternInput(target_pattern_index=128)
+
+    async def test_query_timeout_returns_timeout_error(self, dry_bridge):
+        """When query times out (no response injected), return TIMEOUT error."""
+        dry_bridge._dry_run = False
+        dry_bridge._input_port = unittest.mock.Mock()
+        dry_bridge._output_port = unittest.mock.Mock()
+
+        fn = _tool("song_project_management", "fl_get_song_tempo")
+        result = parse(await fn(GetSongTempoInput(timeout_ms=100)))
+        assert result["error"] == "TIMEOUT"
+
+        dry_bridge._dry_run = True
+        dry_bridge._input_port = None
+        dry_bridge._output_port = None
+
+
+# ---------------------------------------------------------------------------
+# 4. CLI Command Tests
 # ---------------------------------------------------------------------------
 
 
 class TestSongProjectCLI:
+    def test_cli_help_shows_all_commands(self):
+        runner = CliRunner()
+        result = runner.invoke(main, ["--help"])
+        assert result.exit_code == 0
+        for cmd in [
+            "get-song-length", "set-song-marker", "get-marker", "delete-marker",
+            "insert-marker", "get-song-tempo", "set-song-bpm", "get-song-bpm",
+            "set-song-tempo-relative", "get-song-info", "save-as-project",
+            "export-audio", "get-mixer-track-count", "get-channel-count",
+            "get-pattern-count", "get-current-pattern", "set-current-pattern",
+            "duplicate-pattern", "copy-pattern", "cut-pattern", "paste-pattern",
+            "clear-pattern", "connect", "disconnect", "status",
+        ]:
+            assert cmd in result.output, f"Missing command: {cmd}"
+
     def test_cli_get_song_length_dry_run(self, mock_home):
         runner = CliRunner()
         runner.invoke(main, ["connect", "--port", "Test Port", "--dry-run"])

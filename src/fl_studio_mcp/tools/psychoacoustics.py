@@ -4,10 +4,10 @@ def fl_psychoacoustic_exciter() -> str:
     to create the illusion of extreme width and loudness without clipping.
     """
     return (
-        f"Analyzed Master bus dynamics.\\n"
-        f"Applied mid-side EQ curve (boosting side highs).\\n"
-        f"Injected even-order harmonic distortion.\\n"
-        f"Psychoacoustic width and perceived loudness maximized."
+        "Analyzed Master bus dynamics.\\n"
+        "Applied mid-side EQ curve (boosting side highs).\\n"
+        "Injected even-order harmonic distortion.\\n"
+        "Psychoacoustic width and perceived loudness maximized."
     )
 
 def register(mcp) -> None:

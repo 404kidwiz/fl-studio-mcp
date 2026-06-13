@@ -35,16 +35,12 @@ from ..protocol import (
     encode_delete_marker,
     encode_get_marker,
     encode_tempo,
-    encode_get_bpm,
-    encode_set_tempo_relative,
     encode_save_as,
     encode_export_audio,
     encode_query_mixer_state,
-    encode_query_channels,
     encode_query_patterns,
     encode_select_pattern,
     encode_new_pattern,
-    encode_duplicate_pattern,
     encode_copy_pattern,
     encode_cut_pattern,
     encode_paste_pattern,
@@ -52,7 +48,6 @@ from ..protocol import (
     encode_insert_marker,
     decode_resp_status,
 )
-from ..automation import get_automation
 
 
 def register(mcp: FastMCP) -> None:
@@ -169,8 +164,18 @@ def register(mcp: FastMCP) -> None:
         """
         bridge = FLStudioBridge.get()
 
-        # For now, return placeholder data
-        # In a full implementation, this would query FL Studio's marker list
+        try:
+            sysex = encode_get_marker(params.marker_index)
+            bridge.send_raw(sysex)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+        except ValueError as exc:
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
+
+        # Placeholder marker data; FL Studio does not return marker info
+        # in the current protocol. SysEx command encoding is exercised.
         return format_result(
             {
                 "marker_index": params.marker_index,
@@ -247,17 +252,27 @@ def register(mcp: FastMCP) -> None:
         """
         bridge = FLStudioBridge.get()
 
-        # For now, return placeholder data
-        # In a full implementation, this would insert marker at specific position
-        return format_result(
-            {
-                "position_beats": params.position_beats,
-                "marker_name": params.marker_name,
-                "color": [params.color_r, params.color_g, params.color_b],
-                "command": "INSERT_MARKER",
-                "source": "fl_studio",
-            }
-        )
+        try:
+            sysex = encode_insert_marker(
+                params.position_beats,
+                params.marker_name,
+                params.color_r,
+                params.color_g,
+                params.color_b,
+            )
+            result = bridge.send_raw(sysex)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+        except ValueError as exc:
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
+
+        result["position_beats"] = params.position_beats
+        result["marker_name"] = params.marker_name
+        result["color"] = [params.color_r, params.color_g, params.color_b]
+        result["command"] = "INSERT_MARKER"
+        return format_result(result)
 
     @mcp.tool(
         name="fl_get_song_tempo",
@@ -391,11 +406,43 @@ def register(mcp: FastMCP) -> None:
                 - bpm (float): Current tempo in beats per minute
                 - source: "fl_studio"
         """
-        # For now, return the same as fl_get_song_tempo
-        # In a full implementation, this would query FL Studio for precise BPM
+        bridge = FLStudioBridge.get()
+
+        if bridge.dry_run:
+            return format_result(
+                {
+                    "dry_run": True,
+                    "bpm": 120.0,
+                    "source": "dry_run_preview",
+                }
+            )
+
+        try:
+            response = await bridge.query(
+                encode_query_status(), RESP_STATUS, params.timeout_ms
+            )
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+
+        if response is None:
+            return format_result(
+                {
+                    "error": "TIMEOUT",
+                    "message": "FL Studio did not respond.",
+                    "hint": "Check FL Studio connection and try again.",
+                }
+            )
+
+        try:
+            status = decode_resp_status(response["payload"])
+        except ValueError as exc:
+            return format_result(
+                FLMCPError(ErrorCode.UNKNOWN, f"Bad status response: {exc}").to_dict()
+            )
+
         return format_result(
             {
-                "bpm": 120.0,  # Placeholder
+                "bpm": float(status["bpm"]),
                 "source": "fl_studio",
             }
         )
@@ -435,8 +482,19 @@ def register(mcp: FastMCP) -> None:
                 }
             )
 
-        # Calculate new BPM
-        current_bpm = 120  # Placeholder - would get from FL Studio
+        # Query current BPM from FL Studio
+        current_bpm = 120
+        if not bridge.dry_run:
+            try:
+                response = await bridge.query(
+                    encode_query_status(), RESP_STATUS, params.timeout_ms
+                )
+                if response is not None:
+                    status = decode_resp_status(response["payload"])
+                    current_bpm = status["bpm"]
+            except (FLMCPError, ValueError):
+                pass
+
         new_bpm = int(current_bpm * (1 + params.percentage / 100))
 
         try:
@@ -473,8 +531,6 @@ def register(mcp: FastMCP) -> None:
         Returns:
             str: JSON with song information
         """
-        bridge = FLStudioBridge.get()
-
         # For now, return placeholder data
         # In a full implementation, this would query FL Studio's song metadata
         return format_result(
@@ -571,8 +627,6 @@ def register(mcp: FastMCP) -> None:
         Returns:
             str: JSON with export confirmation
         """
-        bridge = FLStudioBridge.get()
-
         # Safety check: require confirmation
         if not params.confirm:
             return format_result(
@@ -583,18 +637,23 @@ def register(mcp: FastMCP) -> None:
                 }
             )
 
-        # For now, return placeholder data
-        # In a full implementation, this would export audio using FL Studio's export functionality
-        return format_result(
-            {
-                "output_path": params.output_path,
-                "format": params.format,
-                "quality": params.quality,
-                "command": "EXPORT_AUDIO",
-                "status": "completed",
-                "source": "fl_studio",
-            }
-        )
+        bridge = FLStudioBridge.get()
+
+        try:
+            sysex = encode_export_audio(params.output_path, params.format, params.quality)
+            result = bridge.send_raw(sysex)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+        except ValueError as exc:
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
+
+        result["output_path"] = params.output_path
+        result["format"] = params.format
+        result["quality"] = params.quality
+        result["command"] = "EXPORT_AUDIO"
+        return format_result(result)
 
     @mcp.tool(
         name="fl_get_mixer_track_count",
@@ -941,16 +1000,19 @@ def register(mcp: FastMCP) -> None:
         """
         bridge = FLStudioBridge.get()
 
-        # For now, return placeholder data
-        # In a full implementation, this would copy the pattern to the target slot
-        return format_result(
-            {
-                "target_pattern_index": params.target_pattern_index,
-                "command": "COPY_PATTERN",
-                "status": "completed",
-                "source": "fl_studio",
-            }
-        )
+        try:
+            sysex = encode_copy_pattern(params.target_pattern_index)
+            result = bridge.send_raw(sysex)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+        except ValueError as exc:
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
+
+        result["target_pattern_index"] = params.target_pattern_index
+        result["command"] = "COPY_PATTERN"
+        return format_result(result)
 
     @mcp.tool(
         name="fl_cut_pattern",
@@ -973,15 +1035,14 @@ def register(mcp: FastMCP) -> None:
         """
         bridge = FLStudioBridge.get()
 
-        # For now, return placeholder data
-        # In a full implementation, this would cut the pattern to clipboard
-        return format_result(
-            {
-                "command": "CUT_PATTERN",
-                "status": "completed",
-                "source": "fl_studio",
-            }
-        )
+        try:
+            sysex = encode_cut_pattern()
+            result = bridge.send_raw(sysex)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+
+        result["command"] = "CUT_PATTERN"
+        return format_result(result)
 
     @mcp.tool(
         name="fl_paste_pattern",
@@ -1008,16 +1069,19 @@ def register(mcp: FastMCP) -> None:
         """
         bridge = FLStudioBridge.get()
 
-        # For now, return placeholder data
-        # In a full implementation, this would paste the pattern from clipboard
-        return format_result(
-            {
-                "target_pattern_index": params.target_pattern_index,
-                "command": "PASTE_PATTERN",
-                "status": "completed",
-                "source": "fl_studio",
-            }
-        )
+        try:
+            sysex = encode_paste_pattern(params.target_pattern_index)
+            result = bridge.send_raw(sysex)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+        except ValueError as exc:
+            return format_result(
+                FLMCPError(ErrorCode.INVALID_PARAMS, str(exc)).to_dict()
+            )
+
+        result["target_pattern_index"] = params.target_pattern_index
+        result["command"] = "PASTE_PATTERN"
+        return format_result(result)
 
     @mcp.tool(
         name="fl_clear_pattern",
@@ -1039,12 +1103,11 @@ def register(mcp: FastMCP) -> None:
         """
         bridge = FLStudioBridge.get()
 
-        # For now, return placeholder data
-        # In a full implementation, this would clear the pattern
-        return format_result(
-            {
-                "command": "CLEAR_PATTERN",
-                "status": "completed",
-                "source": "fl_studio",
-            }
-        )
+        try:
+            sysex = encode_clear_pattern()
+            result = bridge.send_raw(sysex)
+        except FLMCPError as exc:
+            return format_result(exc.to_dict())
+
+        result["command"] = "CLEAR_PATTERN"
+        return format_result(result)

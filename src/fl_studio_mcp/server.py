@@ -19,9 +19,9 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP  # noqa: E402
 
-from .tools import (
+from .tools import (  # noqa: E402
     channels,
     composition,
     connection,
@@ -109,7 +109,7 @@ from .tools import (
     song_project_management,
 )
 
-from . import resources, prompts
+from . import resources, prompts  # noqa: E402
 
 mcp = FastMCP(
     "fl_studio_mcp",

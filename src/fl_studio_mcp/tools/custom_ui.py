@@ -4,10 +4,10 @@ def fl_holographic_mixer_ui() -> str:
     parameters across the whole project, mapped to a single macro dashboard using Patcher.
     """
     return (
-        f"Analyzed project to find 10 most-automated parameters.\\n"
-        f"Instantiated Control Surface inside Master Patcher.\\n"
-        f"Linked 10 visual macro knobs to target VST/Mixer paths.\\n"
-        f"Holographic Mixer UI generated and linked."
+        "Analyzed project to find 10 most-automated parameters.\\n"
+        "Instantiated Control Surface inside Master Patcher.\\n"
+        "Linked 10 visual macro knobs to target VST/Mixer paths.\\n"
+        "Holographic Mixer UI generated and linked."
     )
 
 def register(mcp) -> None:

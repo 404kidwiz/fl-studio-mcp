@@ -1,10 +1,10 @@
 # FL Studio MCP — Project Summary
 
 **Version:** 0.10.0  
-**Status:** Sprint 6 Song/Project Management complete — 26 new tools for markers, tempo, song info, export, mixer/channel/pattern queries, and pattern clipboard operations. 22 new CLI commands. 88 new tests. 3 comprehensive documentation files.  
+**Status:** Sprint 6 Song/Project Management complete — 26 new tools for markers, tempo, song info, export, mixer/channel/pattern queries, and pattern clipboard operations. 22 new CLI commands. 100 new tests. All placeholders replaced with real SysEx encoding. `validate_color()` and `cli_echo()` helpers added.  
 **Last updated:** 2026-06-12  
 **Commits:** 19 (previous 18 + Sprint 6 Song/Project Management)  
-**Tests:** 460 passing, 0 failing  
+**Tests:** 472 passing, 0 failing  
 **Total tools:** 166  
 **Total source lines:** ~13,500
 
@@ -362,7 +362,7 @@ A command-line tool `fl-studio` is available to control the bridge script direct
 | `python-rtmidi` | ≥1.5.8 | mido backend for real hardware MIDI ports |
 | `pydantic` | ≥2.7.0 | Input validation, Note/ChordStep schemas |
 
-**Dev only:** `pytest ≥9.0.3`, `pytest-asyncio ≥1.3.0`  
+**Dev only:** `pytest ≥9.0.3`, `pytest-asyncio ≥1.3.0`, `ruff ≥0.11.0`, `mypy ≥1.15.0`  
 **Python:** ≥3.11  
 **Build:** Hatchling, `uv` for environment management
 
@@ -370,7 +370,7 @@ A command-line tool `fl-studio` is available to control the bridge script direct
 
 ## Testing
 
-**221 tests across 10 files — zero hardware required.**
+**472 tests across 11 files — zero hardware required.**
 
 | File | Tests | Coverage area |
 |------|-------|---------------|
@@ -396,7 +396,7 @@ FL_MCP_DRY_RUN=1 uv run pytest # explicit dry-run flag
 
 `.github/workflows/test.yml` — runs on push to `main`/`develop` and all PRs.  
 Matrix: Python 3.11 + 3.12.  
-Steps: `uv sync` → `pytest tests/ -v` → `python -c "import fl_studio_mcp"` smoke test.
+Steps: `uv sync` → `ruff check` (lint) → `pytest tests/ -v` → `python -c "import fl_studio_mcp"` smoke test.
 
 ---
 

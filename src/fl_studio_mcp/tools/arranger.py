@@ -1,4 +1,3 @@
-import os
 
 def fl_generate_song_structure(bars: int = 64, style: str = "Pop") -> str:
     """
@@ -23,9 +22,9 @@ def fl_generate_transitions(density: str = "Medium") -> str:
     Automatically generates risers, crashes, and reverse sounds between song sections.
     """
     return (
-        f"FL Studio API: Analyzing Playlist structure for section boundaries.\\n"
-        f"Added 4 Risers, 4 Downlifters/Crashes, and 2 Reverse Cymbals.\\n"
-        f"Created 3 automated filter sweeps on the Master/Synth busses."
+        "FL Studio API: Analyzing Playlist structure for section boundaries.\\n"
+        "Added 4 Risers, 4 Downlifters/Crashes, and 2 Reverse Cymbals.\\n"
+        "Created 3 automated filter sweeps on the Master/Synth busses."
     )
 
 def register(mcp) -> None:

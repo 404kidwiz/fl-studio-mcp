@@ -1,7 +1,8 @@
 """Tools: fl_panic, fl_mute_channel, fl_solo_channel, fl_set_mixer_volume, fl_set_mixer_pan, fl_route_to_mixer, fl_get_mixer_state."""
 
-from mcp.server.fastmcp import FastMCP
+import logging
 
+from mcp.server.fastmcp import FastMCP
 from ..bridge import FLStudioBridge, format_result
 from ..errors import ErrorCode, FLMCPError
 from ..models import (
@@ -26,6 +27,8 @@ from ..protocol import (
     decode_resp_mixer_state,
     RESP_MIXER_STATE,
 )
+
+logger = logging.getLogger(__name__)
 
 _NO_LISTENER_HINT = (
     "No MIDI input port is listening. "
@@ -421,7 +424,7 @@ def register(mcp: FastMCP) -> None:
             str: JSON with 'l_peak' and 'r_peak' as floats (0.0 to 1.0).
         """
         try:
-            from ..protocol import CMD_GET_PEAKS, decode_resp_peaks, encode_get_peaks, RESP_PEAKS
+            from ..protocol import decode_resp_peaks, encode_get_peaks, RESP_PEAKS
         except ImportError:
             return format_result({"error": "Protocol extensions not found"})
         
@@ -478,7 +481,7 @@ def register(mcp: FastMCP) -> None:
             str: JSON log showing initial levels, dB differences, fader calculations, and actions taken.
         """
         import math
-        from ..protocol import CMD_GET_PEAKS, decode_resp_peaks, encode_get_peaks, RESP_PEAKS
+        from ..protocol import decode_resp_peaks, encode_get_peaks, RESP_PEAKS
 
         bridge = FLStudioBridge.get()
         results = []

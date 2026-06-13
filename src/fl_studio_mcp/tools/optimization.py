@@ -13,10 +13,10 @@ def fl_cpu_optimizer_bounce() -> str:
     Intelligently analyzes CPU load, finds the heaviest VST chains, and automatically Bounces in Place.
     """
     return (
-        f"Analyzed CPU load across all mixer tracks.\\n"
-        f"Detected high latency on Track 5 (Omnisphere + Soothe2).\\n"
-        f"Bounced Track 5 in Place to audio.\\n"
-        f"Muted original VSTs to free up CPU resources. Project latency optimized."
+        "Analyzed CPU load across all mixer tracks.\\n"
+        "Detected high latency on Track 5 (Omnisphere + Soothe2).\\n"
+        "Bounced Track 5 in Place to audio.\\n"
+        "Muted original VSTs to free up CPU resources. Project latency optimized."
     )
 
 def register(mcp) -> None:

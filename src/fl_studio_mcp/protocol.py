@@ -41,6 +41,12 @@ _SYSEX_START = 0xF0
 _SYSEX_END = 0xF7
 _MANUFACTURER_ID = 0x7D  # non-commercial / development
 
+
+def validate_color(r: int, g: int, b: int) -> None:
+    """Validate each RGB component is in 0–255 range."""
+    if not all(0 <= c <= 255 for c in (r, g, b)):
+        raise ValueError("color components must be 0-255")
+
 # Server → FL Studio commands
 CMD_PLAY = 0x01
 CMD_STOP = 0x02
@@ -642,12 +648,6 @@ def encode_show_window(window_index: int) -> bytes:
     return _sysex(CMD_SHOW_WINDOW, [window_index & 0x7F])
 
 
-def encode_add_marker(name: str) -> bytes:
-    """Encode CMD_ADD_MARKER."""
-    safe = [ord(c) for c in name[:14] if ord(c) <= 127]
-    return _sysex(CMD_ADD_MARKER, [len(safe)] + safe)
-
-
 def encode_get_peaks(track_idx: int) -> bytes:
     """Encode CMD_GET_PEAKS."""
     return _sysex(CMD_GET_PEAKS, [track_idx & 0x7F])
@@ -743,7 +743,13 @@ def encode_set_channel_color(channel_idx: int, r: int, g: int, b: int) -> bytes:
     """Color RGB must be 0-255. Split into 4-bit nibbles for 7-bit SysEx compliance."""
     if not 0 <= channel_idx <= 127:
         raise ValueError("channel_idx out of range")
-    # Pack as: r_hi, r_lo, g_hi, g_lo, b_hi, b_lo
+    validate_color(r, g, b)
+    return _sysex(CMD_SET_CHANNEL_COLOR, [
+        channel_idx & 0x7F,
+        (r >> 4) & 0x0F, r & 0x0F,
+        (g >> 4) & 0x0F, g & 0x0F,
+        (b >> 4) & 0x0F, b & 0x0F,
+    ])
 
 
 # --- Song/Project Management Functions ---
@@ -759,8 +765,7 @@ def encode_add_marker(marker_name: str, r: int, g: int, b: int) -> bytes:
         raise ValueError("marker_name cannot be empty")
     if len(marker_name) > 127:
         raise ValueError("marker_name too long")
-    if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255):
-        raise ValueError("color components must be 0-255")
+    validate_color(r, g, b)
     name_bytes = [ord(c) if ord(c) < 128 else 63 for c in marker_name]
     color_bytes = [
         (r >> 4) & 0x0F, r & 0x0F,
@@ -802,8 +807,7 @@ def encode_insert_marker(position_beats: float, marker_name: str, r: int, g: int
         raise ValueError("marker_name cannot be empty")
     if len(marker_name) > 127:
         raise ValueError("marker_name too long")
-    if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255):
-        raise ValueError("color components must be 0-255")
+    validate_color(r, g, b)
     # Convert position_beats to 16-bit integer (multiply by 100 for precision)
     position_ticks = int(position_beats * 100)
     pos_hi = (position_ticks >> 7) & 0x7F
@@ -865,47 +869,6 @@ def encode_export_audio(output_path: str, format: str, quality: int) -> bytes:
     return _sysex(CMD_EXPORT_AUDIO, [len(path_bytes)] + path_bytes + [format_codes[format], quality])
 
 
-def encode_query_mixer_state(start_track: int, end_track: int) -> bytes:
-    """Encode a QUERY_MIXER_STATE command.
-    
-    Payload: [start_track, end_track]
-    """
-    if not 0 <= start_track <= 127:
-        raise ValueError("start_track out of range")
-    if not 0 <= end_track <= 127:
-        raise ValueError("end_track out of range")
-    if start_track > end_track:
-        raise ValueError("start_track must be <= end_track")
-    if end_track - start_track > 31:
-        raise ValueError("range must be <= 31 tracks")
-    return _sysex(CMD_QUERY_MIXER_STATE, [start_track, end_track])
-
-
-def encode_query_channels() -> bytes:
-    """Encode a QUERY_CHANNELS command."""
-    return _sysex(CMD_QUERY_CHANNELS, [])
-
-
-def encode_query_patterns() -> bytes:
-    """Encode a QUERY_PATTERNS command."""
-    return _sysex(CMD_QUERY_PATTERNS, [])
-
-
-def encode_select_pattern(pattern_index: int) -> bytes:
-    """Encode a SELECT_PATTERN command.
-    
-    Payload: [pattern_index]
-    """
-    if not 0 <= pattern_index <= 127:
-        raise ValueError("pattern_index out of range")
-    return _sysex(CMD_SELECT_PATTERN, [pattern_index])
-
-
-def encode_new_pattern() -> bytes:
-    """Encode a NEW_PATTERN command."""
-    return _sysex(CMD_NEW_PATTERN, [])
-
-
 def encode_duplicate_pattern() -> bytes:
     """Encode a DUPLICATE_PATTERN command."""
     return _sysex(CMD_DUPLICATE_PATTERN, [])
@@ -939,12 +902,6 @@ def encode_paste_pattern(target_pattern_index: int) -> bytes:
 def encode_clear_pattern() -> bytes:
     """Encode a CLEAR_PATTERN command."""
     return _sysex(CMD_CLEAR_PATTERN, [])
-    return _sysex(CMD_SET_CHANNEL_COLOR, [
-        channel_idx & 0x7F,
-        (r >> 4) & 0x0F, r & 0x0F,
-        (g >> 4) & 0x0F, g & 0x0F,
-        (b >> 4) & 0x0F, b & 0x0F
-    ])
 
 
 def encode_set_pattern_color(pattern_idx: int, r: int, g: int, b: int) -> bytes:

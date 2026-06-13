@@ -3,7 +3,7 @@
 from mcp.server.fastmcp import FastMCP
 
 from ..bridge import FLStudioBridge, format_result
-from ..errors import FLMCPError
+from ..errors import ErrorCode, FLMCPError
 from ..models import PlayStopInput, SetTimeSelectionInput
 from ..protocol import mmc_play, mmc_stop, encode_set_time_selection
 

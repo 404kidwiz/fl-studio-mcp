@@ -6,7 +6,6 @@ import os
 import json
 import logging
 import zipfile
-from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 

@@ -2,10 +2,8 @@
 Vision-Language Model (VLM) & GUI integration for FL Studio MCP.
 Allows visual reading of VST plugins and coordinate-based clicking.
 """
-import os
 import json
 import logging
-from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 

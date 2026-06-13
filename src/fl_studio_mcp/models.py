@@ -1011,7 +1011,7 @@ class SetSongBpmInput(BaseModel):
 
 class GetSongBpmInput(BaseModel):
     """Input for retrieving the current BPM as a floating-point number."""
-    pass
+    timeout_ms: int = Field(default=2000, ge=100, le=10000, description="Response wait timeout in milliseconds")
 
 
 class SetSongTempoRelativeInput(BaseModel):

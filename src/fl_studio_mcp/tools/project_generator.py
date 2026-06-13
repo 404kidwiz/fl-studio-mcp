@@ -5,9 +5,9 @@ import logging
 import os
 from mcp.server.fastmcp import FastMCP
 
-from ..bridge import FLStudioBridge, format_result
+from ..bridge import format_result
 from ..errors import ErrorCode, FLMCPError
-from ..models import GenerateProjectInput, ChannelInitInput
+from ..models import GenerateProjectInput
 
 logger = logging.getLogger(__name__)
 

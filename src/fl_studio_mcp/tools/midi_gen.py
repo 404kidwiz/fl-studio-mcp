@@ -5,7 +5,6 @@ Simulates a local Transformer sequence generation for realistic MIDI sequences.
 import json
 import logging
 import random
-from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 

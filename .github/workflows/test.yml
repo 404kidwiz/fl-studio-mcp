@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
+      - name: Lint check
+        run: uv run ruff check src/
+
       - name: Run tests
         env:
           FL_MCP_DRY_RUN: "1"

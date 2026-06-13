@@ -273,10 +273,8 @@ def register(mcp: FastMCP) -> None:
         """
         import os
         import subprocess
-        import sys
         import struct
         import math
-        from ..models import RenderProjectInput
 
         # Perform executable lookup
         exe_path = find_fl_studio_exe()

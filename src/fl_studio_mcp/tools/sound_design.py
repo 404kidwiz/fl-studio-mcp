@@ -1,4 +1,3 @@
-import os
 
 def fl_generate_synth_preset(prompt: str, synth_target: str = "Vital") -> str:
     """

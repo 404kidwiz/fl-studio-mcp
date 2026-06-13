@@ -27,7 +27,7 @@ def install() -> None:
     src_script = dev_path if dev_path.exists() else pkg_path
     
     if not src_script.exists():
-        print(f"Error: Could not find device_fl_mcp_bridge.py.", file=sys.stderr)
+        print("Error: Could not find device_fl_mcp_bridge.py.", file=sys.stderr)
         print(f"Checked paths:\n- {dev_path}\n- {pkg_path}", file=sys.stderr)
         sys.exit(1)
 
