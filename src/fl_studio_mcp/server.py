@@ -106,6 +106,7 @@ from .tools import (
     glitch_generator,
     sidechain_carver,
     track_sheet,
+    song_project_management,
 )
 
 from . import resources, prompts
@@ -215,6 +216,7 @@ audio_harmonizer.register(mcp)
 glitch_generator.register(mcp)
 sidechain_carver.register(mcp)
 track_sheet.register(mcp)
+song_project_management.register(mcp)
 
 # Register resources and prompts
 resources.register(mcp)

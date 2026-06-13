@@ -17,7 +17,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-blue?style=for-the-badge&logo=python" alt="Python Versions"/>
   <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-green?style=for-the-badge" alt="Platforms"/>
-  <img src="https://img.shields.io/badge/Tests-383%20Passing-success?style=for-the-badge&logo=pytest" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-460%20Passing-success?style=for-the-badge&logo=pytest" alt="Tests"/>
   <img src="https://img.shields.io/badge/License-MIT-orange?style=for-the-badge" alt="License"/>
 </p>
 
@@ -25,7 +25,7 @@
 
 ## 🎼 Overwhelming Developer & Producer Power
 
-The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **121 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, version control, and extreme AI automation—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
+The **FL Studio MCP** (Model Context Protocol) is an open-source bridge that enables AI agents to seamlessly interact with FL Studio. This project exposes **166 distinct tools**—ranging from basic transport controls and channel rack sequencing to advanced features like mixing, mastering, arrangement generation, live performance, generative vocals, version control, and extreme AI automation—directly to any MCP-compatible AI (like Claude, Gemini, or custom LLM wrappers).
 
 Whether you're looking to generate complex polyrhythms, optimize harmonic chord voicings, or automate a visual click inside Serum, the FL Studio MCP gives you full, type-safe, dry-run-capable control over your DAW.
 
@@ -70,9 +70,9 @@ The codebase is highly modular and strictly structured:
 
 ---
 
-## 🧰 The Toolkit (101 Tools)
+## 🧰 The Toolkit (166 Tools)
 
-FL Studio MCP exposes a massively comprehensive suite of **111 distinct tools**, broken down by production phase:
+FL Studio MCP exposes a massively comprehensive suite of **166 distinct tools**, broken down by production phase:
 
 ### 1. Connection & Diagnostics (3)
 | Tool Name | Description | Needs Bridge Script |
@@ -97,10 +97,11 @@ FL Studio MCP exposes a massively comprehensive suite of **111 distinct tools**,
 | `fl_insert_notes` | Play or record 1-128 MIDI notes. Accepts pitch ints (60) or names (`"C4"`, `"F#3"`). | **Yes** |
 | `fl_add_chord_progression` | Inserts structured progressions. Supports random velocity humanization and swing. | **Yes** |
 
-### 4. Project Operations (1)
+### 4. Project Operations (2)
 | Tool Name | Description | Needs Bridge Script |
 |:---|:---|:---:|
 | `fl_save_project` | Triggers a project save (Ctrl+S equivalent) to protect your session work. | **Yes** |
+| `fl_save_as_project` | Saves the current project with a new filename. | **Yes** |
 
 ### 5. Status & Channels (4)
 | Tool Name | Description | Needs Bridge Script |
@@ -119,7 +120,33 @@ FL Studio MCP exposes a massively comprehensive suite of **111 distinct tools**,
 | `fl_rename_channel` | Updates the text label of a channel rack slot. | **Yes** |
 | `fl_rename_pattern` | Updates the text label of a pattern slot. | **Yes** |
 
-### 7. Pattern Info & Read (3)
+### 7. Song / Project Management (22)
+| Tool Name | Description | Needs Bridge Script |
+|:---|:---|:---:|
+| `fl_get_song_length` | Gets the total duration of the current song. | **No** |
+| `fl_set_song_marker` | Adds a marker at the current transport position. | **Yes** |
+| `fl_get_marker` | Gets marker details by index. | **No** |
+| `fl_delete_marker` | Deletes a marker from the playlist. | **Yes** |
+| `fl_insert_marker` | Inserts a marker at a specific beat position. | **No** |
+| `fl_get_song_tempo` | Queries the current project tempo from FL Studio. | **Yes** |
+| `fl_set_song_bpm` | Changes the project tempo to a specified BPM. | **Yes** |
+| `fl_get_song_bpm` | Returns the current BPM as a float. | **No** |
+| `fl_set_song_tempo_relative` | Adjusts tempo by a percentage relative to current. | **Yes** |
+| `fl_get_song_info` | Returns metadata (title, author, key, time sig). | **No** |
+| `fl_export_audio` | Exports audio from the project with quality settings. | **No** |
+| `fl_get_mixer_track_count` | Gets the number of mixer tracks. | **Yes** |
+| `fl_get_channel_count` | Gets the number of channel rack channels. | **Yes** |
+| `fl_get_pattern_count` | Gets the number of patterns. | **Yes** |
+| `fl_get_current_pattern` | Gets the currently selected pattern index. | **Yes** |
+| `fl_set_current_pattern` | Selects a pattern by index. | **Yes** |
+| `fl_duplicate_pattern` | Duplicates the current pattern. | **Yes** |
+| `fl_copy_pattern` | Copies the current pattern to a target slot. | **No** |
+| `fl_cut_pattern` | Cuts the current pattern to clipboard. | **No** |
+| `fl_paste_pattern` | Pastes pattern from clipboard to a target slot. | **No** |
+| `fl_clear_pattern` | Clears all notes from the current pattern. | **No** |
+| `fl_save_as_project` | Saves current project with a new filename. | **Yes** |
+
+### 8. Pattern Info & Read (3)
 | Tool Name | Description | Needs Bridge Script |
 |:---|:---|:---:|
 | `fl_get_notes` | **[Bidirectional]** Reads notes of the active pattern from the MIDI controller cache. | **Yes** |

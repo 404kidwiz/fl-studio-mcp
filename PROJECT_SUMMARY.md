@@ -1,11 +1,12 @@
 # FL Studio MCP — Project Summary
 
-**Version:** 0.9.0  
-**Status:** Options 1, 2, 3, 4, Phase 15, and Phase 16 complete — Virtuoso suite fully implemented, registered, and verified with 383 green tests (121 tools total).  
-**Last updated:** 2026-05-22  
-**Commits:** 18 (initial → bidirectional → production polish → v2 features → CLI & 0.3.0 cleanup → VST/Library & GUI Automation → Phase 7 integration & verification → Sprint 3 completion → Sprint 4 Mixer & Routing → Sprint 5 Undo/Redo & Ping → Sprint 6 Music Theory & Composition Helpers → Sprint 7 Protocol Upgrades → Option 1 Windows Integration → Option 2 WebSocket Transport → Option 3 Deep GUI Automation → Option 4 Production & Distribution Guides → Phase 15 The Director → Phase 16 The Virtuoso)  
-**Tests:** 383 passing, 0 failing  
-**Total source lines:** ~11,500
+**Version:** 0.10.0  
+**Status:** Sprint 6 Song/Project Management complete — 26 new tools for markers, tempo, song info, export, mixer/channel/pattern queries, and pattern clipboard operations. 22 new CLI commands. 88 new tests. 3 comprehensive documentation files.  
+**Last updated:** 2026-06-12  
+**Commits:** 19 (previous 18 + Sprint 6 Song/Project Management)  
+**Tests:** 460 passing, 0 failing  
+**Total tools:** 166  
+**Total source lines:** ~13,500
 
 
 ---

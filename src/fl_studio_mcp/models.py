@@ -959,3 +959,134 @@ class AutoMixInput(WriteCommandInput):
     tracks: list[int] = Field(..., description="List of mixer track indices to analyze and balance (1-127).")
     target_db: float = Field(default=-12.0, ge=-48.0, le=0.0, description="Target peak level in dB for the balanced tracks.")
     headroom_db: float = Field(default=-3.0, ge=-12.0, le=0.0, description="Additional headroom or scaling margin.")
+
+
+# ---------------------------------------------------------------------------
+# Song/Project Management Models
+# ---------------------------------------------------------------------------
+
+
+class GetSongLengthInput(BaseModel):
+    """Input for retrieving the total duration of the current song."""
+    pass
+
+
+class SetSongMarkerInput(BaseModel):
+    """Input for setting a marker at the current position."""
+    marker_name: str = Field(..., description="Name for the marker")
+    color_r: int = Field(default=255, ge=0, le=255, description="Red component (0-255)")
+    color_g: int = Field(default=255, ge=0, le=255, description="Green component (0-255)")
+    color_b: int = Field(default=255, ge=0, le=255, description="Blue component (0-255)")
+
+
+class GetMarkerInput(BaseModel):
+    """Input for retrieving information about a specific marker."""
+    marker_index: int = Field(..., ge=0, description="Zero-based index of the marker")
+
+
+class DeleteMarkerInput(BaseModel):
+    """Input for deleting a marker from the playlist."""
+    marker_index: int = Field(..., ge=0, description="Zero-based index of the marker to delete")
+
+
+class InsertMarkerInput(BaseModel):
+    """Input for inserting a marker at a specific position."""
+    position_beats: float = Field(..., ge=0, description="Position in beats where to insert marker")
+    marker_name: str = Field(..., description="Name for the marker")
+    color_r: int = Field(default=255, ge=0, le=255, description="Red component (0-255)")
+    color_g: int = Field(default=255, ge=0, le=255, description="Green component (0-255)")
+    color_b: int = Field(default=255, ge=0, le=255, description="Blue component (0-255)")
+
+
+class GetSongTempoInput(BaseModel):
+    """Input for retrieving the current tempo (BPM) of the song."""
+    timeout_ms: int = Field(default=2000, ge=100, le=10000, description="Response wait timeout in milliseconds")
+
+
+class SetSongBpmInput(BaseModel):
+    """Input for setting the tempo (BPM) of the song."""
+    bpm: int = Field(..., ge=20, le=999, description="Target BPM (20-999)")
+    confirm: bool = Field(default=False, description="Confirmation flag to prevent accidental changes")
+
+
+class GetSongBpmInput(BaseModel):
+    """Input for retrieving the current BPM as a floating-point number."""
+    pass
+
+
+class SetSongTempoRelativeInput(BaseModel):
+    """Input for adjusting the tempo relative to the current BPM."""
+    percentage: float = Field(..., ge=-50, le=200, description="Percentage change (-50 to 200)")
+    confirm: bool = Field(default=False, description="Confirmation flag to prevent accidental changes")
+
+
+class GetSongInfoInput(BaseModel):
+    """Input for retrieving comprehensive information about the current song."""
+    pass
+
+
+class SaveAsProjectInput(BaseModel):
+    """Input for saving the current project with a new filename."""
+    filename: str = Field(..., description="New filename (with .flp extension)")
+    confirm: bool = Field(default=False, description="Confirmation flag to prevent accidental overwrites")
+
+
+class ExportAudioInput(BaseModel):
+    """Input for exporting audio from the project."""
+    output_path: str = Field(..., description="Path where to save the exported audio file")
+    format: str = Field(..., description="Audio format ('wav', 'mp3', 'flac')")
+    quality: int = Field(default=90, ge=0, le=100, description="Quality level (0-100, higher is better)")
+    confirm: bool = Field(default=False, description="Confirmation flag to prevent accidental exports")
+
+
+class GetMixerTrackCountInput(BaseModel):
+    """Input for retrieving the number of tracks in the mixer."""
+    timeout_ms: int = Field(default=2000, ge=100, le=10000, description="Response wait timeout in milliseconds")
+
+
+class GetChannelCountInput(BaseModel):
+    """Input for retrieving the number of channels in the channel rack."""
+    timeout_ms: int = Field(default=2000, ge=100, le=10000, description="Response wait timeout in milliseconds")
+
+
+class GetPatternCountInput(BaseModel):
+    """Input for retrieving the number of patterns in the song."""
+    timeout_ms: int = Field(default=2000, ge=100, le=10000, description="Response wait timeout in milliseconds")
+
+
+class GetCurrentPatternInput(BaseModel):
+    """Input for retrieving the index of the currently selected pattern."""
+    timeout_ms: int = Field(default=2000, ge=100, le=10000, description="Response wait timeout in milliseconds")
+
+
+class SetCurrentPatternInput(BaseModel):
+    """Input for setting the currently selected pattern."""
+    pattern_index: int = Field(..., ge=0, description="Zero-based pattern index to select")
+    confirm: bool = Field(default=False, description="Confirmation flag to prevent accidental changes")
+
+
+class DuplicatePatternInput(BaseModel):
+    """Input for duplicating the current pattern."""
+    pass
+
+
+class CopyPatternInput(BaseModel):
+    """Input for copying the current pattern to a specific slot."""
+    target_pattern_index: int = Field(..., ge=0, le=127, description="Target pattern slot index (0-127)")
+    confirm: bool = Field(default=False, description="Confirmation flag")
+
+
+class CutPatternInput(BaseModel):
+    """Input for cutting the current pattern to clipboard."""
+    pass
+
+
+class PastePatternInput(BaseModel):
+    """Input for pasting pattern from clipboard to a specific slot."""
+    target_pattern_index: int = Field(..., ge=0, le=127, description="Target pattern slot index (0-127)")
+    confirm: bool = Field(default=False, description="Confirmation flag")
+
+
+class ClearPatternInput(BaseModel):
+    """Input for clearing the current pattern."""
+    pass

@@ -102,6 +102,23 @@ RESP_MIXER_STATE = 0x1C
 RESP_ACK = 0x1F
 RESP_PLUGIN_PARAM = 0x24
 
+# Song/Project Management Commands
+CMD_ADD_MARKER = 0x2B
+CMD_DELETE_MARKER = 0x2C
+CMD_GET_MARKER = 0x2D
+CMD_INSERT_MARKER = 0x2E
+CMD_SET_TEMPO_RELATIVE = 0x2F
+CMD_GET_BPM = 0x30
+CMD_SAVE_AS = 0x31
+CMD_EXPORT_AUDIO = 0x32
+CMD_SELECT_PATTERN = 0x0A
+CMD_NEW_PATTERN = 0x09
+CMD_DUPLICATE_PATTERN = 0x35
+CMD_COPY_PATTERN = 0x36
+CMD_CUT_PATTERN = 0x37
+CMD_PASTE_PATTERN = 0x38
+CMD_CLEAR_PATTERN = 0x39
+
 # MMC device ID 0x7F = "all devices"
 _MMC_PLAY = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x02, 0xF7])
 _MMC_STOP = bytes([0xF0, 0x7F, 0x7F, 0x06, 0x01, 0xF7])
@@ -727,6 +744,201 @@ def encode_set_channel_color(channel_idx: int, r: int, g: int, b: int) -> bytes:
     if not 0 <= channel_idx <= 127:
         raise ValueError("channel_idx out of range")
     # Pack as: r_hi, r_lo, g_hi, g_lo, b_hi, b_lo
+
+
+# --- Song/Project Management Functions ---
+
+
+def encode_add_marker(marker_name: str, r: int, g: int, b: int) -> bytes:
+    """Encode an ADD_MARKER command.
+    
+    Payload: [name_len, name_bytes..., r_hi, r_lo, g_hi, g_lo, b_hi, b_lo]
+    Color components are split into 4-bit nibbles (2 bytes per component).
+    """
+    if not marker_name:
+        raise ValueError("marker_name cannot be empty")
+    if len(marker_name) > 127:
+        raise ValueError("marker_name too long")
+    if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255):
+        raise ValueError("color components must be 0-255")
+    name_bytes = [ord(c) if ord(c) < 128 else 63 for c in marker_name]
+    color_bytes = [
+        (r >> 4) & 0x0F, r & 0x0F,
+        (g >> 4) & 0x0F, g & 0x0F,
+        (b >> 4) & 0x0F, b & 0x0F,
+    ]
+    return _sysex(CMD_ADD_MARKER, [len(name_bytes)] + name_bytes + color_bytes)
+
+
+def encode_delete_marker(marker_index: int) -> bytes:
+    """Encode a DELETE_MARKER command.
+    
+    Payload: [marker_index]
+    """
+    if not 0 <= marker_index <= 127:
+        raise ValueError("marker_index out of range")
+    return _sysex(CMD_DELETE_MARKER, [marker_index])
+
+
+def encode_get_marker(marker_index: int) -> bytes:
+    """Encode a GET_MARKER command.
+    
+    Payload: [marker_index]
+    """
+    if not 0 <= marker_index <= 127:
+        raise ValueError("marker_index out of range")
+    return _sysex(CMD_GET_MARKER, [marker_index])
+
+
+def encode_insert_marker(position_beats: float, marker_name: str, r: int, g: int, b: int) -> bytes:
+    """Encode an INSERT_MARKER command.
+    
+    Payload: [pos_hi, pos_lo, name_len, name_bytes..., r_hi, r_lo, g_hi, g_lo, b_hi, b_lo]
+    Color components are split into 4-bit nibbles (2 bytes per component).
+    """
+    if not 0 <= int(position_beats) <= 127:
+        raise ValueError("position_beats must be 0-127")
+    if not marker_name:
+        raise ValueError("marker_name cannot be empty")
+    if len(marker_name) > 127:
+        raise ValueError("marker_name too long")
+    if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255):
+        raise ValueError("color components must be 0-255")
+    # Convert position_beats to 16-bit integer (multiply by 100 for precision)
+    position_ticks = int(position_beats * 100)
+    pos_hi = (position_ticks >> 7) & 0x7F
+    pos_lo = position_ticks & 0x7F
+    
+    name_bytes = [ord(c) if ord(c) < 128 else 63 for c in marker_name]
+    color_bytes = [
+        (r >> 4) & 0x0F, r & 0x0F,
+        (g >> 4) & 0x0F, g & 0x0F,
+        (b >> 4) & 0x0F, b & 0x0F,
+    ]
+    return _sysex(CMD_INSERT_MARKER, [pos_hi, pos_lo, len(name_bytes)] + name_bytes + color_bytes)
+
+
+def encode_set_tempo_relative(percentage: int) -> bytes:
+    """Encode a SET_TEMPO_RELATIVE command.
+    
+    Payload: [percentage]
+    """
+    if not -50 <= percentage <= 200:
+        raise ValueError("percentage must be between -50 and 200")
+    return _sysex(CMD_SET_TEMPO_RELATIVE, [percentage & 0x7F])
+
+
+def encode_get_bpm() -> bytes:
+    """Encode a GET_BPM command."""
+    return _sysex(CMD_GET_BPM, [])
+
+
+def encode_save_as(filename: str) -> bytes:
+    """Encode a SAVE_AS command.
+    
+    Payload: [filename_len, filename_bytes...]
+    """
+    if not filename:
+        raise ValueError("filename cannot be empty")
+    filename_bytes = [ord(c) if ord(c) < 128 else 63 for c in filename]
+    if len(filename_bytes) > 127:
+        raise ValueError("filename too long")
+    return _sysex(CMD_SAVE_AS, [len(filename_bytes)] + filename_bytes)
+
+
+def encode_export_audio(output_path: str, format: str, quality: int) -> bytes:
+    """Encode an EXPORT_AUDIO command.
+    
+    Payload: [path_len, path_bytes..., format_code, quality]
+    """
+    if not output_path:
+        raise ValueError("output_path cannot be empty")
+    format_codes = {"wav": 0, "mp3": 1, "flac": 2}
+    if format not in format_codes:
+        raise ValueError(f"Unsupported format: {format}")
+    if not 0 <= quality <= 100:
+        raise ValueError("quality must be 0-100")
+    
+    path_bytes = [ord(c) if ord(c) < 128 else 63 for c in output_path]
+    if len(path_bytes) > 127:
+        raise ValueError("output_path too long")
+    return _sysex(CMD_EXPORT_AUDIO, [len(path_bytes)] + path_bytes + [format_codes[format], quality])
+
+
+def encode_query_mixer_state(start_track: int, end_track: int) -> bytes:
+    """Encode a QUERY_MIXER_STATE command.
+    
+    Payload: [start_track, end_track]
+    """
+    if not 0 <= start_track <= 127:
+        raise ValueError("start_track out of range")
+    if not 0 <= end_track <= 127:
+        raise ValueError("end_track out of range")
+    if start_track > end_track:
+        raise ValueError("start_track must be <= end_track")
+    if end_track - start_track > 31:
+        raise ValueError("range must be <= 31 tracks")
+    return _sysex(CMD_QUERY_MIXER_STATE, [start_track, end_track])
+
+
+def encode_query_channels() -> bytes:
+    """Encode a QUERY_CHANNELS command."""
+    return _sysex(CMD_QUERY_CHANNELS, [])
+
+
+def encode_query_patterns() -> bytes:
+    """Encode a QUERY_PATTERNS command."""
+    return _sysex(CMD_QUERY_PATTERNS, [])
+
+
+def encode_select_pattern(pattern_index: int) -> bytes:
+    """Encode a SELECT_PATTERN command.
+    
+    Payload: [pattern_index]
+    """
+    if not 0 <= pattern_index <= 127:
+        raise ValueError("pattern_index out of range")
+    return _sysex(CMD_SELECT_PATTERN, [pattern_index])
+
+
+def encode_new_pattern() -> bytes:
+    """Encode a NEW_PATTERN command."""
+    return _sysex(CMD_NEW_PATTERN, [])
+
+
+def encode_duplicate_pattern() -> bytes:
+    """Encode a DUPLICATE_PATTERN command."""
+    return _sysex(CMD_DUPLICATE_PATTERN, [])
+
+
+def encode_copy_pattern(target_pattern_index: int) -> bytes:
+    """Encode a COPY_PATTERN command.
+    
+    Payload: [target_pattern_index]
+    """
+    if not 0 <= target_pattern_index <= 127:
+        raise ValueError("target_pattern_index out of range")
+    return _sysex(CMD_COPY_PATTERN, [target_pattern_index])
+
+
+def encode_cut_pattern() -> bytes:
+    """Encode a CUT_PATTERN command."""
+    return _sysex(CMD_CUT_PATTERN, [])
+
+
+def encode_paste_pattern(target_pattern_index: int) -> bytes:
+    """Encode a PASTE_PATTERN command.
+    
+    Payload: [target_pattern_index]
+    """
+    if not 0 <= target_pattern_index <= 127:
+        raise ValueError("target_pattern_index out of range")
+    return _sysex(CMD_PASTE_PATTERN, [target_pattern_index])
+
+
+def encode_clear_pattern() -> bytes:
+    """Encode a CLEAR_PATTERN command."""
+    return _sysex(CMD_CLEAR_PATTERN, [])
     return _sysex(CMD_SET_CHANNEL_COLOR, [
         channel_idx & 0x7F,
         (r >> 4) & 0x0F, r & 0x0F,
